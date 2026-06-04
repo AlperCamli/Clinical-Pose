@@ -26,7 +26,7 @@ export default function SessionReviewScreen({ route }) {
 
   return (
     <Screen>
-      <TopBar onBack={() => nav.go('timeline', { cid: c.id, caseId: cs.id })} title="Session Review" sub={s.label} border />
+      <TopBar onBack={() => nav.back()} title="Session Review" sub={s.label} border />
       <ScrollBody contentStyle={{ paddingHorizontal: PAD, paddingTop: 14, paddingBottom: 8 }}>
         <Spread style={{ marginHorizontal: 3, marginBottom: 12 }}>
           <Tag variant={s.kind === 'before' ? 'accent' : 'ok'}>{`${s.kind === 'before' ? 'BEFORE' : 'AFTER'} · ${fmtDate(s.date).toUpperCase()}`}</Tag>
@@ -67,7 +67,16 @@ export default function SessionReviewScreen({ route }) {
       <ActionBar>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {hasBefore && <Btn variant="soft" icon="slider" iconSize={18} label="Compare" onPress={() => nav.go('compare', { cid: c.id, caseId: cs.id })} style={{ flex: 1 }} />}
-          <Btn variant="primary" icon="check" iconSize={18} label="Save session" onPress={() => { toast('Session saved'); nav.go('timeline', { cid: c.id, caseId: cs.id }); }} style={{ flex: 1.4 }} />
+          <Btn variant="primary" icon="check" iconSize={18} label="Save session" onPress={() => {
+            toast('Session saved');
+            // Land on the Timeline hub with a clean back chain (→ client → home),
+            // regardless of whether we came via the capture wizard or the timeline.
+            nav.reset([
+              { name: 'home' },
+              { name: 'clientProfile', params: { cid: c.id } },
+              { name: 'timeline', params: { cid: c.id, caseId: cs.id } },
+            ]);
+          }} style={{ flex: 1.4 }} />
         </View>
       </ActionBar>
     </Screen>

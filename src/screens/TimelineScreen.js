@@ -35,7 +35,7 @@ export default function TimelineScreen({ route }) {
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt style={{ fontWeight: '800', fontSize: 17, letterSpacing: -0.3 }}>{T.name}</Txt>
-            <Pressable onPress={() => nav.go('clientProfile', { cid: c.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+            <Pressable onPress={() => nav.popTo('clientProfile', { cid: c.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
               <Txt style={{ fontSize: 12.5, color: C.ink3 }}>{c.name} · {c.code}</Txt>
               <Icon name="chevR" size={12} color={C.ink3} />
             </Pressable>

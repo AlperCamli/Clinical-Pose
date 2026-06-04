@@ -39,7 +39,7 @@ export default function PostExportScreen({ route }) {
           <Btn variant="primary" lg block icon="image" iconSize={19} label="Save to gallery" onPress={() => toast('Saved to gallery')} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Btn icon="share" iconSize={18} label="Share" onPress={() => toast('Opening share…')} style={{ flex: 1 }} />
-            <Btn icon="check" iconSize={18} label="Finish" onPress={() => { toast('Done'); nav.go('timeline', { cid: c.id, caseId: cs.id }); }} style={{ flex: 1 }} />
+            <Btn icon="check" iconSize={18} label="Finish" onPress={() => { toast('Done'); nav.popTo('timeline', { cid: c.id, caseId: cs.id }); }} style={{ flex: 1 }} />
           </View>
         </View>
       </ActionBar>

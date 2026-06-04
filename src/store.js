@@ -1,6 +1,6 @@
 // ============ NATURE — app store, tweaks, toast, navigation adapter ============
 import React from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, StackActions } from '@react-navigation/native';
 import { SEED_CLIENTS } from './data/seed';
 import { clone } from './data/helpers';
 
@@ -62,13 +62,28 @@ export function AppProvider({ children }) {
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }
 
-// Navigation adapter mirroring the prototype's nav.go / replace / back / home.
+// Navigation adapter.
+//   go      — push a new screen (forward / deeper).
+//   popTo   — return to an EXISTING screen, popping everything above it; pushes
+//             if it isn't in the stack. This is what stops the back button from
+//             cycling A→B→A→B when you navigate "up" to a screen already below.
+//   navigateOrReplace — finishing capture: pop back to Session Review if we came
+//             from it (re-take), otherwise replace the current camera screen.
+//   reset   — rebuild the stack (used to land on the Timeline hub after a save).
 export function useNav() {
   const navigation = useNavigation();
   return React.useMemo(
     () => ({
       go: (screen, params = {}) => navigation.push(screen, params),
+      push: (screen, params = {}) => navigation.push(screen, params),
       replace: (screen, params = {}) => navigation.replace(screen, params),
+      popTo: (screen, params = {}) => navigation.dispatch(StackActions.popTo(screen, params)),
+      navigateOrReplace: (screen, params = {}) => {
+        const exists = navigation.getState()?.routes?.some((r) => r.name === screen);
+        if (exists) navigation.dispatch(StackActions.popTo(screen, params));
+        else navigation.replace(screen, params);
+      },
+      reset: (routes, index) => navigation.reset({ index: index ?? routes.length - 1, routes }),
       back: () => navigation.goBack(),
       home: () => navigation.popToTop(),
     }),

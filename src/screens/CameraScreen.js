@@ -84,7 +84,7 @@ export default function CameraScreen({ route }) {
     setShot(null);
     const nm = nextMissing();
     if (nm !== undefined) setIdx(nm);
-    else { toast('Session captured'); nav.replace('sessionReview', params); }
+    else { toast('Session captured'); nav.navigateOrReplace('sessionReview', params); }
   };
   const retake = () => { delete s.photos[a.id]; store.bump(); setShot(null); };
 
@@ -103,7 +103,7 @@ export default function CameraScreen({ route }) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 }}>
-          <CamBtn name="x" onPress={() => nav.go('angleChecklist', { cid: params.cid, caseId: params.caseId, sessionId: params.sessionId })} />
+          <CamBtn name="x" onPress={() => nav.back()} />
           <View style={{ alignItems: 'center' }}>
             <Txt style={{ fontWeight: '700', fontSize: 15, color: '#fff' }}>{a.name}</Txt>
             <Txt mono style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 }}>{a.code} · {idx + 1}/{angles.length}</Txt>
