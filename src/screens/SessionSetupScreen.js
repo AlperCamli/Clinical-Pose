@@ -28,8 +28,7 @@ export default function SessionSetupScreen({ route }) {
 
   const start = () => {
     const session = { id: uid(), kind: isAfter ? 'after' : 'before', label, date: TODAY, photos: {}, refSource: ref };
-    cs.sessions.push(session);
-    store.bump();
+    store.addSession(c.id, cs.id, session);
     nav.replace('angleChecklist', { cid: c.id, caseId: cs.id, sessionId: session.id });
   };
 

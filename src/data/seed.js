@@ -15,18 +15,18 @@ export const SEED_CLIENTS = [
     consentClinical: true, consentSocial: true, eyeDefault: 'hidden', initials: 'AK',
     cases: [
       {
-        id: 'case1', treatment: 'lip', started: '2026-05-21', practitioner: 'Dr. Demir',
+        id: 'c1-lip', treatment: 'lip', started: '2026-05-21', practitioner: 'Dr. Demir',
         sessions: [
-          { id: 's1', kind: 'before', label: 'Baseline Before', date: '2026-05-21',
+          { id: 'c1-lip-s1', kind: 'before', label: 'Baseline Before', date: '2026-05-21',
             photos: makeCaptured(TREATMENTS.lip.angles.filter((a) => a.req), 'before') },
-          { id: 's2', kind: 'after', label: 'After 2 weeks', date: '2026-06-04',
+          { id: 'c1-lip-s2', kind: 'after', label: 'After 2 weeks', date: '2026-06-04',
             photos: makeCaptured(TREATMENTS.lip.angles.filter((a) => a.req), 'after') },
         ],
       },
       {
-        id: 'case2', treatment: 'botox', started: '2026-04-12', practitioner: 'Dr. Demir',
+        id: 'c1-botox', treatment: 'botox', started: '2026-04-12', practitioner: 'Dr. Demir',
         sessions: [
-          { id: 's1', kind: 'before', label: 'Baseline Before', date: '2026-04-12',
+          { id: 'c1-botox-s1', kind: 'before', label: 'Baseline Before', date: '2026-04-12',
             photos: makeCaptured(TREATMENTS.botox.angles.filter((a) => a.req), 'before') },
         ],
       },
@@ -37,9 +37,9 @@ export const SEED_CLIENTS = [
     consentClinical: true, consentSocial: false, eyeDefault: 'hidden', initials: 'MY',
     cases: [
       {
-        id: 'case1', treatment: 'jaw', started: '2026-05-30', practitioner: 'Dr. Aydın',
+        id: 'c2-jaw', treatment: 'jaw', started: '2026-05-30', practitioner: 'Dr. Aydın',
         sessions: [
-          { id: 's1', kind: 'before', label: 'Baseline Before', date: '2026-05-30',
+          { id: 'c2-jaw-s1', kind: 'before', label: 'Baseline Before', date: '2026-05-30',
             photos: makeCaptured(TREATMENTS.jaw.angles.filter((a) => a.req), 'before') },
         ],
       },
@@ -50,9 +50,9 @@ export const SEED_CLIENTS = [
     consentClinical: true, consentSocial: true, eyeDefault: 'visible', initials: 'LF',
     cases: [
       {
-        id: 'case1', treatment: 'skin', started: '2026-06-01', practitioner: 'Dr. Demir',
+        id: 'c3-skin', treatment: 'skin', started: '2026-06-01', practitioner: 'Dr. Demir',
         sessions: [
-          { id: 's1', kind: 'before', label: 'Baseline Before', date: '2026-06-01',
+          { id: 'c3-skin-s1', kind: 'before', label: 'Baseline Before', date: '2026-06-01',
             photos: makeCaptured(TREATMENTS.skin.angles.filter((a) => a.req), 'before') },
         ],
       },

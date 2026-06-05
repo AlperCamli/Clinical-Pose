@@ -16,6 +16,8 @@ privacy-safe **social-media posts** — with clinical and social consent kept st
 | Runtime | Expo SDK 56 (React Native 0.85, React 19) |
 | Navigation | `@react-navigation/native-stack` |
 | Camera | `expo-camera` (`CameraView` + `useCameraPermissions`) — real capture |
+| Local store | `expo-sqlite` (clients/cases/sessions/photos/consent, source of truth) |
+| Photo files | `expo-file-system` (app-private copy) + `expo-media-library` (gallery mirror) |
 | Vector UI | `react-native-svg` (icon set, treatment glyphs, photo silhouette) |
 | Gradients | `expo-linear-gradient` |
 | Fonts | `@expo-google-fonts/hanken-grotesk` + `@expo-google-fonts/geist-mono` |
@@ -43,11 +45,13 @@ npx expo start         # then press i / a, or scan the QR with Expo Go
 App.js                     fonts → SafeAreaProvider → AppProvider → NavigationContainer → RootNavigator + Toast
 src/
   theme.js                 design tokens (colors, radii, density, shadows) + font-weight → family resolver
-  store.js                 AppProvider (in-memory client store + tweaks + toast) and useApp / useNav hooks
+  store.js                 AppProvider (hydrates from SQLite, persists every mutation) + useApp / useNav
   navigation.js            native-stack with all 19 route components
   data/
+    db.js                  SQLite schema, seed migration, loadAll() graph hydration, upsert/delete
+    photos.js              persist capture → app-private file + mirror to "Nature" gallery album
     treatments.js          8 treatment protocols and their required/optional angles
-    seed.js                seed clients, cases, sessions, recent activity
+    seed.js                first-launch demo clients, cases, sessions, recent activity
     helpers.js             date fmt, capture counts, ids, TODAY
   components/
     Txt.js                 Text wrapper that maps fontWeight → the correct Google-font variant
@@ -60,9 +64,26 @@ src/
   screens/                 one file per screen (see mapping below)
 ```
 
-State mirrors the prototype: a mutable client store in a ref with a version bump, navigation params
-carry `cid` / `caseId` / `sessionId`, and captured photos (including real `uri`s) flow through the
-`store.capturePhoto` action into the timeline, review, compare and post screens.
+The runtime working copy is an in-memory client graph held in a ref (version-bumped to re-render).
+On launch `AppProvider` hydrates it from SQLite (seeding demo data on first run); every mutation goes
+through a store method (`addClient`, `updateClient`, `setConsent`, `addCase`, `addSession`,
+`capturePhoto`, `removePhoto`) that updates the graph **and** writes through to the database. Captured
+photos are copied into app-private storage (the record's source of truth) and mirrored into a "Nature"
+gallery album; the file path is what flows into timeline, review, compare and post screens.
+
+### Persistence (Phase 1 — local, offline)
+
+```
+SQLite (nature.db)                         photo files
+  clients   ─┐                               documentDirectory/photos/{client}/{case}/{session}/{angle}.jpg
+  cases     ─┤ loadAll() rebuilds the         (app-private — the record of truth)
+  sessions  ─┤ nested client→case→            └─ mirrored into the "Nature" album in the device gallery
+  photos    ─┘ session→photo graph
+  consent_events  (clinical audit trail)
+```
+
+Every row carries `serverId` / `updatedAt` / `dirty`, so **Phase 2 (Supabase sync)** can push dirty
+rows + upload photos without a schema migration. Needs your project URL / anon key + an auth decision.
 
 ## Screen mapping (flow report → code)
 
@@ -100,9 +121,14 @@ carry `cid` / `caseId` / `sessionId`, and captured photos (including real `uri`s
 
 ## Known limitations (MVP preview)
 
-- Data is in-memory (resets on reload); no backend/persistence/real sync yet — the Sync screen simulates
-  the offline upload queue as in the design.
-- Compare/post **before vs. after** images use the same placeholder subject (the prototype had no real
-  brightness filter); with real captured photos each angle shows its actual image.
-- "Save to gallery" / "Share" surface confirmation toasts rather than writing to the OS gallery / share
-  sheet (would add `expo-media-library` / `Sharing` in a follow-up).
+- **Persistence is local-only (Phase 1).** Clients/cases/sessions/photos survive reloads via SQLite, and
+  captured photos persist to private storage + the gallery. Cloud sync (Supabase) is **Phase 2** — the
+  Sync screen still simulates the upload queue until that's wired.
+- Abandoning a half-finished capture still leaves the just-created (empty) case/session behind, since the
+  record is created on entry — a data-lifecycle item for the logic pass.
+- Retaking a photo deletes the app-private copy but leaves the earlier gallery mirror in the camera roll
+  (deleting gallery assets prompts the user on iOS, which is too heavy for a retake).
+- Compare/post **before vs. after** previews still use the placeholder subject (no per-angle real image
+  wired into Compare yet); the capture/review/timeline screens show actual captured photos.
+- "Save to gallery" / "Share" on the export screen still surface confirmation toasts rather than rendering
+  the composed asset to the gallery / system share sheet.

@@ -14,7 +14,9 @@
       }
     },
     "android": {
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -32,6 +34,15 @@
         "expo-camera",
         {
           "cameraPermission": "Nature uses the camera to capture standardized clinical before/after photos."
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Nature saves clinical before/after photos to a private Nature album in your library.",
+          "savePhotosPermission": "Nature saves clinical before/after photos to your library.",
+          "isAccessMediaLocationEnabled": false
         }
       ]
     ]

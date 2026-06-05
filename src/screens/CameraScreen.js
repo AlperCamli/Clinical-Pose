@@ -75,8 +75,9 @@ export default function CameraScreen({ route }) {
       uri = p?.uri;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) { /* simulator / no camera — continue without a real image */ }
-    store.capturePhoto(c.id, cs.id, s.id, a.id, { status: 'captured', uri, eyeHidden });
-    setShot({ aid: a.id, uri });
+    // persist (copy to private storage + mirror to gallery) and use the stored uri
+    const rec = await store.capturePhoto(c.id, cs.id, s.id, a.id, { status: 'captured', uri, eyeHidden });
+    setShot({ aid: a.id, uri: rec?.uri ?? uri });
     setBusy(false);
   };
 
@@ -86,7 +87,7 @@ export default function CameraScreen({ route }) {
     if (nm !== undefined) setIdx(nm);
     else { toast('Session captured'); nav.navigateOrReplace('sessionReview', params); }
   };
-  const retake = () => { delete s.photos[a.id]; store.bump(); setShot(null); };
+  const retake = () => { store.removePhoto(c.id, cs.id, s.id, a.id); setShot(null); };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0c0f14' }}>

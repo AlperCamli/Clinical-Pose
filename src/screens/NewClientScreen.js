@@ -25,8 +25,8 @@ export default function NewClientScreen({ route }) {
 
   const save = () => {
     if (editing) {
-      Object.assign(editing, { name, phone, consentClinical: clin, consentSocial: soc, eyeDefault: eye });
-      store.bump(); toast('Client updated'); nav.back(); return;
+      store.updateClient(editing.id, { name, phone, consentClinical: clin, consentSocial: soc, eyeDefault: eye });
+      toast('Client updated'); nav.back(); return;
     }
     const c = {
       id: uid(), name: name || 'New Client', code, phone, consentClinical: clin, consentSocial: soc,

@@ -1,8 +1,17 @@
 // ============ NATURE — app store, tweaks, toast, navigation adapter ============
 import React from 'react';
+import { View } from 'react-native';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { SEED_CLIENTS } from './data/seed';
-import { clone } from './data/helpers';
+import { C } from './theme';
+import {
+  initDB, seedIfEmpty, loadAll,
+  upsertClient, upsertCaseGraph, upsertSession, upsertPhoto, deletePhotoRow, addConsentEvent,
+} from './data/db';
+import { persistPhoto, deletePhotoFile } from './data/photos';
+
+// fire-and-forget persistence: keep the UI snappy, log if a write fails
+const save = (p) => Promise.resolve(p).catch((e) => console.warn('[nature] persist failed', e));
 
 const AppCtx = React.createContext(null);
 export const useApp = () => React.useContext(AppCtx);
@@ -18,8 +27,13 @@ const TWEAK_DEFAULTS = {
 };
 
 export function AppProvider({ children }) {
-  const clientsRef = React.useRef(clone(SEED_CLIENTS));
-  const [, setVer] = React.useState(0);
+  // The in-memory client graph is the runtime working copy; it is hydrated from
+  // SQLite on launch and every mutation is mirrored back to the database.
+  const clientsRef = React.useRef([]);
+  const [hydrated, setHydrated] = React.useState(false);
+  // `ver` is threaded into the context value below so that bump() (called after
+  // every in-place mutation of the client ref) actually re-renders consumers.
+  const [ver, setVer] = React.useState(0);
   const bump = React.useCallback(() => setVer((v) => v + 1), []);
 
   const [t, setT] = React.useState(TWEAK_DEFAULTS);
@@ -33,32 +47,93 @@ export function AppProvider({ children }) {
     toastTimer.current = setTimeout(() => setToastMsg(null), 1900);
   }, []);
 
-  const store = React.useMemo(
-    () => ({
+  // Hydrate from the database once (seeding the demo data on first launch).
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        await initDB();
+        await seedIfEmpty(SEED_CLIENTS);
+        const data = await loadAll();
+        if (alive) clientsRef.current = data;
+      } catch (e) {
+        console.warn('[nature] hydrate failed', e);
+      } finally {
+        if (alive) setHydrated(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const store = React.useMemo(() => {
+    const find = (cid) => clientsRef.current.find((x) => x.id === cid);
+    const findCase = (cid, caseId) => find(cid)?.cases.find((x) => x.id === caseId);
+    const findSession = (cid, caseId, sid) => findCase(cid, caseId)?.sessions.find((x) => x.id === sid);
+    return {
       get clients() { return clientsRef.current; },
       bump,
-      addClient: (c) => { clientsRef.current = [c, ...clientsRef.current]; bump(); },
+      addClient: (c) => {
+        clientsRef.current = [c, ...clientsRef.current];
+        bump();
+        save(upsertClient(c));
+      },
+      updateClient: (cid, patch) => {
+        const c = find(cid);
+        if (!c) return;
+        Object.assign(c, patch);
+        bump();
+        save(upsertClient(c));
+      },
+      setConsent: (cid, kind, granted) => {
+        const c = find(cid);
+        if (!c) return;
+        if (kind === 'clinical') c.consentClinical = granted; else c.consentSocial = granted;
+        bump();
+        save(upsertClient(c));
+        save(addConsentEvent(cid, kind, granted));
+      },
       addCase: (cid, cs) => {
-        const c = clientsRef.current.find((x) => x.id === cid);
+        const c = find(cid);
+        if (!c) return;
         c.cases.unshift(cs);
         bump();
+        save(upsertCaseGraph(cid, cs));
       },
-      capturePhoto: (cid, caseId, sid, aid, data) => {
-        const c = clientsRef.current.find((x) => x.id === cid);
-        const cs = c.cases.find((x) => x.id === caseId);
-        const s = cs.sessions.find((x) => x.id === sid);
-        s.photos[aid] = data;
+      addSession: (cid, caseId, session) => {
+        const cs = findCase(cid, caseId);
+        if (!cs) return;
+        cs.sessions.push(session);
         bump();
+        save(upsertSession(caseId, session));
       },
-    }),
-    [bump]
-  );
+      capturePhoto: async (cid, caseId, sid, aid, data) => {
+        const s = findSession(cid, caseId, sid);
+        if (!s) return null;
+        const { uri } = await persistPhoto(data.uri, { clientId: cid, caseId, sessionId: sid, angleId: aid });
+        const rec = { status: data.status ?? 'captured', eyeHidden: data.eyeHidden, tag: data.tag, uri };
+        s.photos[aid] = rec;
+        bump();
+        save(upsertPhoto(sid, aid, rec));
+        return rec;
+      },
+      removePhoto: (cid, caseId, sid, aid) => {
+        const s = findSession(cid, caseId, sid);
+        if (!s) return;
+        const rec = s.photos[aid];
+        delete s.photos[aid];
+        bump();
+        save(deletePhotoRow(sid, aid));
+        deletePhotoFile(rec?.uri);
+      },
+    };
+  }, [bump]);
 
   const value = React.useMemo(
-    () => ({ store, t, setTweak, toast, toastMsg }),
-    [store, t, setTweak, toast, toastMsg]
+    () => ({ store, t, setTweak, toast, toastMsg, ver }),
+    [store, t, setTweak, toast, toastMsg, ver]
   );
 
+  if (!hydrated) return <View style={{ flex: 1, backgroundColor: C.paper }} />;
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }
 

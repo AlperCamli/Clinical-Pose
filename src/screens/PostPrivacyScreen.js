@@ -43,7 +43,7 @@ export default function PostPrivacyScreen({ route }) {
           <View style={{ flex: 1 }}>
             <Txt style={{ fontWeight: '700', fontSize: 14, color: '#9a6406' }}>Social-media consent is off</Txt>
             <Txt style={{ fontSize: 12.5, color: C.ink3, marginTop: 3, marginBottom: 10 }}>{c.name} has not granted social use. Export is blocked.</Txt>
-            <Btn label="Record consent now" onPress={() => { c.consentSocial = true; store.bump(); toast('Consent recorded'); }} style={{ backgroundColor: '#fff', borderColor: C.warn, alignSelf: 'flex-start' }} color="#9a6406" />
+            <Btn label="Record consent now" onPress={() => { store.setConsent(c.id, 'social', true); toast('Consent recorded'); }} style={{ backgroundColor: '#fff', borderColor: C.warn, alignSelf: 'flex-start' }} color="#9a6406" />
           </View>
         </Card>
       )}

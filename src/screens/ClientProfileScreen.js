@@ -75,14 +75,14 @@ export default function ClientProfileScreen({ route }) {
               <Txt style={{ fontWeight: '600' }}>Clinical archive</Txt>
               <Txt style={{ fontSize: 12, color: C.ink3 }}>Granted · 21 May 2026</Txt>
             </View>
-            <Switch on={c.consentClinical} onChange={(v) => { c.consentClinical = v; store.bump(); }} />
+            <Switch on={c.consentClinical} onChange={(v) => store.setConsent(c.id, 'clinical', v)} />
           </View>
           <View style={[consentRow, { borderTopWidth: 1, borderTopColor: C.line }]}>
             <View style={{ flex: 1 }}>
               <Txt style={{ fontWeight: '600' }}>Social media use</Txt>
               <Txt style={{ fontSize: 12, color: C.ink3 }}>{c.consentSocial ? 'Granted' : 'Not granted'}</Txt>
             </View>
-            <Switch on={c.consentSocial} onChange={(v) => { c.consentSocial = v; store.bump(); }} />
+            <Switch on={c.consentSocial} onChange={(v) => store.setConsent(c.id, 'social', v)} />
           </View>
         </Card>
         <Btn variant="primary" block label="Done" onPress={() => setConsentOpen(false)} />

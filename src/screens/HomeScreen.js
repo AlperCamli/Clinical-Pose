@@ -18,7 +18,10 @@ export default function HomeScreen() {
 
   const active = [];
   store.clients.forEach((c) =>
-    c.cases.forEach((cs) => active.push({ c, cs, last: cs.sessions[cs.sessions.length - 1] }))
+    c.cases.forEach((cs) => {
+      if (!cs.sessions.length) return; // skip cases with no captured session yet
+      active.push({ c, cs, last: cs.sessions[cs.sessions.length - 1] });
+    })
   );
 
   const startCase = () => nav.go('treatmentPicker', {});
