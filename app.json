@@ -11,7 +11,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Nature uses the camera to capture standardized clinical before/after photos."
       },
-      "bundleIdentifier": "com.anonymous.nature"
+      "bundleIdentifier": "com.alpercamli.nature"
     },
     "android": {
       "permissions": [
@@ -30,7 +30,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.anonymous.nature"
+      "package": "com.alpercamli.nature"
     },
     "web": {
       "favicon": "./assets/favicon.png"

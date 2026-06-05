@@ -116,7 +116,7 @@ export default function Photo({
           return (
             <BlurView
               key={i}
-              intensity={Platform.OS === 'android' ? 90 : 60}
+              intensity={Platform.OS === 'android' ? 100 : 85}
               tint="light"
               experimentalBlurMethod="dimezisBlurView"
               style={{ position: 'absolute', left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, overflow: 'hidden' }}

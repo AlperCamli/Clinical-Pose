@@ -75,7 +75,9 @@ export default function CameraScreen({ route }) {
     setBusy(true);
     let uri;
     try {
-      const p = await camRef.current?.takePictureAsync({ quality: 0.75, skipProcessing: true });
+      // skipProcessing:false so the saved file has orientation baked in — keeps
+      // ML Kit's coordinate space, Image.getSize() and the on-screen <Image> aligned.
+      const p = await camRef.current?.takePictureAsync({ quality: 0.8, skipProcessing: false });
       uri = p?.uri;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) { /* simulator / no camera — continue without a real image */ }
@@ -226,6 +228,26 @@ export default function CameraScreen({ route }) {
                   <Txt mono style={{ fontSize: 10.5, fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{t.eyeStyle.toUpperCase()}</Txt>
                 </View>
               </View>
+
+              {/* detection feedback — tells the doctor why the eyes are / aren't hidden */}
+              {shot.uri && (
+                shot.eyeDetected ? (
+                  eyeHidden && (
+                    <Txt style={{ color: '#7fd49b', fontSize: 11.5, textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
+                      Eyes detected · hidden with {t.eyeStyle}
+                    </Txt>
+                  )
+                ) : (
+                  <Txt style={{ color: '#ffb27f', fontSize: 11.5, textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
+                    {shot.status === 'unavailable'
+                      ? 'Auto-detection needs the dev client (not Expo Go) — eyes not hidden'
+                      : shot.status === 'no-face' || shot.status === 'no-eyes'
+                      ? 'No eyes found at this angle — eyes not hidden'
+                      : 'Eye-detection unavailable — eyes not hidden'}
+                  </Txt>
+                )
+              )}
+
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <Btn icon="retake" iconSize={18} label="Retake" onPress={retake} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'transparent' }} color="#fff" />
                 <Btn variant="primary" icon="check" iconSize={18} disabled={busy} label={`Keep ${nextMissing() !== undefined ? '& next' : '& finish'}`} onPress={keep} style={{ flex: 2 }} />
