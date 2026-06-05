@@ -35,13 +35,16 @@ export default function SessionReviewScreen({ route }) {
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11, marginBottom: 14 }}>
           {angles.map((a) => {
-            const cap = s.photos[a.id]?.status === 'captured';
+            const photo = s.photos[a.id];
+            const cap = photo?.status === 'captured';
+            const hidden = photo?.eyeHidden ?? true;
             return (
               <Card key={a.id} style={{ width: '47.8%', flexGrow: 1, overflow: 'hidden', padding: 0 }}>
                 <Pressable onPress={() => nav.go('camera', { ...params, startIdx: angles.indexOf(a) })}>
                   <Photo
-                    angleCode={a.code} eyeHidden={s.photos[a.id]?.eyeHidden ?? true} eyeStyle={t.eyeStyle}
-                    uri={s.photos[a.id]?.uri} variant={cap ? 'plain' : 'empty'} style={{ height: 128, borderRadius: 0, borderWidth: 0 }}
+                    angleCode={a.code} eyeHidden={hidden} eyeStyle={t.eyeStyle}
+                    uri={photo?.uri} eyeBoxes={photo?.eyeBoxes} imgW={photo?.imgW} imgH={photo?.imgH}
+                    variant={cap ? 'plain' : 'empty'} style={{ height: 128, borderRadius: 0, borderWidth: 0 }}
                     overlayLabel={!cap ? (
                       <>
                         <Icon name="camera" size={20} color={C.ink3} />
@@ -52,8 +55,11 @@ export default function SessionReviewScreen({ route }) {
                 </Pressable>
                 <Spread style={{ paddingVertical: 9, paddingHorizontal: 11 }}>
                   <Txt style={{ fontSize: 12.5, fontWeight: '600' }}>{a.name}</Txt>
-                  {cap ? <Icon name="check" size={15} color={C.ok} />
-                    : (a.req ? <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>!</Tag> : <Tag style={{ paddingVertical: 2, paddingHorizontal: 6 }}>OPT</Tag>)}
+                  {cap ? (
+                    <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
+                      <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
+                    </Pressable>
+                  ) : (a.req ? <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>!</Tag> : <Tag style={{ paddingVertical: 2, paddingHorizontal: 6 }}>OPT</Tag>)}
                 </Spread>
               </Card>
             );

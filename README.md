@@ -18,6 +18,7 @@ privacy-safe **social-media posts** — with clinical and social consent kept st
 | Camera | `expo-camera` (`CameraView` + `useCameraPermissions`) — real capture |
 | Local store | `expo-sqlite` (clients/cases/sessions/photos/consent, source of truth) |
 | Photo files | `expo-file-system` (app-private copy) + `expo-media-library` (gallery mirror) |
+| Eye redaction | `@infinitered/react-native-mlkit-face-detection` (detect) + `expo-blur` (blur style) |
 | Vector UI | `react-native-svg` (icon set, treatment glyphs, photo silhouette) |
 | Gradients | `expo-linear-gradient` |
 | Fonts | `@expo-google-fonts/hanken-grotesk` + `@expo-google-fonts/geist-mono` |
@@ -31,13 +32,26 @@ privacy-safe **social-media posts** — with clinical and social consent kept st
 ```bash
 cd nature
 npm install            # already installed in this checkout
-npx expo start         # then press i / a, or scan the QR with Expo Go
+
+# (a) Quick iteration — Expo Go. Everything works EXCEPT auto eye-detection.
+npx expo start         # press i / a, or scan the QR with Expo Go
+
+# (b) Full app incl. ML Kit eye-detection — custom dev client.
+npx expo prebuild      # generates native projects
+npx expo run:ios       # or run:android — builds + installs the dev client
 ```
 
-- **Camera:** the live preview and real photo capture need a **physical device** (simulators have no
-  camera). On the iOS Simulator / Android emulator the camera screen shows a permission prompt with a
-  **“Continue without camera (demo capture)”** link so the whole flow stays walkable without hardware.
-- First launch asks for camera permission (copy is set in `app.json`).
+> **ML Kit needs a dev client.** Camera, SQLite, media-library and blur all ship inside **Expo Go**, so
+> the app runs there — but `@infinitered/react-native-mlkit-face-detection` is a third-party native
+> module that Expo Go can't load. The import is **guarded** ([faceDetection.js](nature/src/data/faceDetection.js)),
+> so in Expo Go the app runs fine and auto eye-detection simply turns off (captured photos save with no
+> stored eye box). For real detection, build a dev client with (b). iOS deployment target 16.4 (SDK 56
+> default) already satisfies ML Kit.
+
+- **Camera + eye detection** need a **physical device** (simulators have no camera). On the simulator the
+  camera screen shows a **“Continue without camera (demo capture)”** link so the flow stays walkable;
+  detection only runs when there's a real photo.
+- First launch asks for camera permission, and the first gallery save asks for photo-library permission.
 
 ## Architecture
 
@@ -85,6 +99,15 @@ SQLite (nature.db)                         photo files
 Every row carries `serverId` / `updatedAt` / `dirty`, so **Phase 2 (Supabase sync)** can push dirty
 rows + upload photos without a schema migration. Needs your project URL / anon key + an auth decision.
 
+### Eye redaction (non-destructive)
+
+The captured **original (eyes-visible)** is the source of truth — saved to private storage and mirrored
+to the gallery unchanged. On capture, ML Kit detects the eyes once ([eyes.js](nature/src/data/eyes.js))
+and stores a **normalized eye-box** + image dims on the photo row (`eyeBoxes` / `imgW` / `imgH`). The app
+then draws the hide overlay from that geometry ([Photo.js](nature/src/components/Photo.js)) — bar / pixel
+(SVG) or blur (`expo-blur`) per the Settings eye-style — so toggling eyes on/off is instant and never
+re-detects. The gallery copy is **not** redacted (eyes-visible originals, by design).
+
 ## Screen mapping (flow report → code)
 
 | Report | Screen | File |
@@ -126,8 +149,13 @@ rows + upload photos without a schema migration. Needs your project URL / anon k
   Sync screen still simulates the upload queue until that's wired.
 - Abandoning a half-finished capture still leaves the just-created (empty) case/session behind, since the
   record is created on entry — a data-lifecycle item for the logic pass.
-- Retaking a photo deletes the app-private copy but leaves the earlier gallery mirror in the camera roll
-  (deleting gallery assets prompts the user on iOS, which is too heavy for a retake).
+- Photos are persisted only on **Keep** (capture is staged for review; Retake discards it), so discarded
+  shots never touch disk or the gallery. Files are named `{angleId}.jpg` (no timestamp); re-capturing an
+  angle overwrites its private file but leaves the previous gallery mirror (iOS prompts to delete assets).
+- **Eye redaction is in-app only (this pass).** It's a non-destructive overlay from stored eye geometry;
+  exported/shared social assets are **not** baked yet (deferred). Angles where ML Kit finds no eyes
+  (profile, base view, crown) get no overlay. Overlay alignment under `cover` + EXIF/front-camera mirroring
+  is the bit most likely to need on-device tuning — verify the box lands on the eyes across angles.
 - Compare/post **before vs. after** previews still use the placeholder subject (no per-angle real image
   wired into Compare yet); the capture/review/timeline screens show actual captured photos.
 - "Save to gallery" / "Share" on the export screen still surface confirmation toasts rather than rendering

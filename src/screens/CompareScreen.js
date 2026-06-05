@@ -95,7 +95,9 @@ export default function CompareScreen({ route }) {
           <ScrollBody horizontal contentStyle={{ gap: 8, paddingBottom: 6 }} style={{ flexGrow: 0 }}>
             {cs.sessions.map((s) => (
               <View key={s.id} style={{ width: 130 }}>
-                <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} uri={s.photos[angleId]?.uri} variant="plain" style={{ height: 170 }} />
+                <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} uri={s.photos[angleId]?.uri}
+                  eyeBoxes={s.photos[angleId]?.eyeBoxes} imgW={s.photos[angleId]?.imgW} imgH={s.photos[angleId]?.imgH}
+                  variant="plain" style={{ height: 170 }} />
                 <View style={{ alignItems: 'center', marginTop: 6 }}>
                   <Txt style={{ fontWeight: '600', fontSize: 12.5 }}>{s.label}</Txt>
                   <Txt mono style={{ fontSize: 10.5, color: C.ink3 }}>{fmtDate(s.date)}</Txt>

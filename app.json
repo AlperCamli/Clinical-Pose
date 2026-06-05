@@ -6,23 +6,31 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Nature uses the camera to capture standardized clinical before/after photos."
-      }
+      },
+      "bundleIdentifier": "com.anonymous.nature"
     },
     "android": {
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.anonymous.nature"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -44,7 +52,8 @@
           "savePhotosPermission": "Nature saves clinical before/after photos to your library.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-image"
     ]
   }
 }

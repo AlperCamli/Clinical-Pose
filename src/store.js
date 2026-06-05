@@ -110,11 +110,23 @@ export function AppProvider({ children }) {
         const s = findSession(cid, caseId, sid);
         if (!s) return null;
         const { uri } = await persistPhoto(data.uri, { clientId: cid, caseId, sessionId: sid, angleId: aid });
-        const rec = { status: data.status ?? 'captured', eyeHidden: data.eyeHidden, tag: data.tag, uri };
+        // eye geometry is normalized (0..1), so it survives the file copy unchanged
+        const rec = {
+          status: data.status ?? 'captured', eyeHidden: data.eyeHidden, tag: data.tag, uri,
+          eyeBoxes: data.eyeBoxes ?? [], eyeDetected: !!data.eyeDetected, imgW: data.imgW, imgH: data.imgH,
+        };
         s.photos[aid] = rec;
         bump();
         save(upsertPhoto(sid, aid, rec));
         return rec;
+      },
+      // flip a saved photo's redaction on/off instantly (no re-detection)
+      setPhotoEyeHidden: (cid, caseId, sid, aid, hidden) => {
+        const rec = findSession(cid, caseId, sid)?.photos[aid];
+        if (!rec) return;
+        rec.eyeHidden = hidden;
+        bump();
+        save(upsertPhoto(sid, aid, rec));
       },
       removePhoto: (cid, caseId, sid, aid) => {
         const s = findSession(cid, caseId, sid);

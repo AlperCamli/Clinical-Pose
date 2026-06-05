@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS photos (
   angleId TEXT NOT NULL,
   status TEXT, eyeHidden INTEGER, tag TEXT,
   localUri TEXT, remoteUrl TEXT,
+  eyeBoxes TEXT, eyeDetected INTEGER, imgW INTEGER, imgH INTEGER,
   createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS consent_events (
@@ -53,16 +54,19 @@ CREATE INDEX IF NOT EXISTS idx_sessions_case ON sessions(caseId);
 CREATE INDEX IF NOT EXISTS idx_photos_session ON photos(sessionId);
 `;
 
-// Bump when the schema or seed shape changes incompatibly. On an older version
-// we drop and rebuild (acceptable while data is still demo/seed) — v1 recovers
-// the corrupted seed caused by non-unique case/session ids.
-const DB_VERSION = 1;
+// Schema version. v1 recovered the corrupted seed (non-unique ids). v2 adds eye
+// redaction columns to `photos`, applied non-destructively via ALTER so any
+// photos already captured on-device are preserved.
+const DB_VERSION = 2;
+const V2_PHOTO_COLS = ['eyeBoxes TEXT', 'eyeDetected INTEGER', 'imgW INTEGER', 'imgH INTEGER'];
 
 export async function initDB() {
   const db = await getDB();
   const row = await db.getFirstAsync('PRAGMA user_version');
   const current = row?.user_version ?? 0;
-  if (current < DB_VERSION) {
+
+  // Pre-v1 (corrupted / never-versioned): drop and rebuild from scratch.
+  if (current < 1) {
     await db.execAsync(`
       DROP TABLE IF EXISTS clients;
       DROP TABLE IF EXISTS cases;
@@ -72,6 +76,14 @@ export async function initDB() {
     `);
   }
   await db.execAsync(SCHEMA);
+
+  // v1 → v2: add the redaction columns to existing photos tables (preserve data).
+  if (current >= 1 && current < 2) {
+    for (const col of V2_PHOTO_COLS) {
+      try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
+    }
+  }
+
   if (current < DB_VERSION) await db.execAsync(`PRAGMA user_version = ${DB_VERSION}`);
 }
 
@@ -123,14 +135,18 @@ export async function upsertSession(caseId, s, createdAt) {
 export async function upsertPhoto(sessionId, angleId, rec, createdAt) {
   const db = await getDB();
   const ts = Date.now();
+  const boxes = rec.eyeBoxes != null ? JSON.stringify(rec.eyeBoxes) : null;
   await db.runAsync(
-    `INSERT INTO photos (id, serverId, sessionId, angleId, status, eyeHidden, tag, localUri, remoteUrl, createdAt, updatedAt, dirty)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
+    `INSERT INTO photos (id, serverId, sessionId, angleId, status, eyeHidden, tag, localUri, remoteUrl,
+       eyeBoxes, eyeDetected, imgW, imgH, createdAt, updatedAt, dirty)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
      ON CONFLICT(id) DO UPDATE SET
        status=excluded.status, eyeHidden=excluded.eyeHidden, tag=excluded.tag,
-       localUri=excluded.localUri, updatedAt=excluded.updatedAt, dirty=1`,
+       localUri=excluded.localUri, eyeBoxes=excluded.eyeBoxes, eyeDetected=excluded.eyeDetected,
+       imgW=excluded.imgW, imgH=excluded.imgH, updatedAt=excluded.updatedAt, dirty=1`,
     [photoId(sessionId, angleId), rec.serverId ?? null, sessionId, angleId, rec.status ?? 'captured',
-      rec.eyeHidden ? 1 : 0, rec.tag ?? null, rec.uri ?? null, rec.remoteUrl ?? null, createdAt ?? ts, ts]
+      rec.eyeHidden ? 1 : 0, rec.tag ?? null, rec.uri ?? null, rec.remoteUrl ?? null,
+      boxes, rec.eyeDetected ? 1 : 0, rec.imgW ?? null, rec.imgH ?? null, createdAt ?? ts, ts]
   );
 }
 
@@ -190,9 +206,12 @@ export async function loadAll() {
   const photosBySession = {};
   for (const p of photoRows) {
     if (!photosBySession[p.sessionId]) photosBySession[p.sessionId] = {};
+    let eyeBoxes;
+    try { eyeBoxes = p.eyeBoxes ? JSON.parse(p.eyeBoxes) : undefined; } catch { eyeBoxes = undefined; }
     photosBySession[p.sessionId][p.angleId] = {
       status: p.status, eyeHidden: !!p.eyeHidden, tag: p.tag || undefined,
       uri: p.localUri || undefined, remoteUrl: p.remoteUrl || undefined,
+      eyeBoxes, eyeDetected: !!p.eyeDetected, imgW: p.imgW || undefined, imgH: p.imgH || undefined,
     };
   }
   const sessionsByCase = {};

@@ -18,10 +18,14 @@ import {
   GeistMono_600SemiBold,
 } from '@expo-google-fonts/geist-mono';
 
+import { FaceDetectionProvider } from './src/data/faceDetection';
 import { AppProvider, useApp } from './src/store';
 import { Toast } from './src/components/ui';
 import RootNavigator from './src/navigation';
 import { C } from './src/theme';
+
+// on-device ML Kit face detection — landmarks on (eyes), fast mode for stills
+const FACE_OPTS = { performanceMode: 'fast', landmarkMode: true };
 
 const navTheme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: C.paper } };
 
@@ -48,15 +52,17 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <NavigationContainer theme={navTheme}>
-          <View style={{ flex: 1 }}>
-            <RootNavigator />
-            <ToastHost />
-          </View>
-        </NavigationContainer>
-        <StatusBar style="dark" />
-      </AppProvider>
+      <FaceDetectionProvider options={FACE_OPTS}>
+        <AppProvider>
+          <NavigationContainer theme={navTheme}>
+            <View style={{ flex: 1 }}>
+              <RootNavigator />
+              <ToastHost />
+            </View>
+          </NavigationContainer>
+          <StatusBar style="dark" />
+        </AppProvider>
+      </FaceDetectionProvider>
     </SafeAreaProvider>
   );
 }

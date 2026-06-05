@@ -3,14 +3,14 @@
 // in-app display and the future Supabase upload) and ALSO mirrors a copy into a
 // "Nature" album in the device gallery (best-effort, honoring the gallery choice).
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
+import { Asset, Album, requestPermissionsAsync } from 'expo-media-library';
 
 const PHOTO_DIR = (FileSystem.documentDirectory || '') + 'photos/';
 const ALBUM = 'Nature';
 
 let mediaPermPromise;
 async function ensureMediaPermission() {
-  if (!mediaPermPromise) mediaPermPromise = MediaLibrary.requestPermissionsAsync();
+  if (!mediaPermPromise) mediaPermPromise = requestPermissionsAsync();
   try {
     const res = await mediaPermPromise;
     return !!res?.granted;
@@ -22,10 +22,10 @@ async function ensureMediaPermission() {
 async function mirrorToGallery(localUri) {
   try {
     if (!(await ensureMediaPermission())) return;
-    const asset = await MediaLibrary.createAssetAsync(localUri);
-    const album = await MediaLibrary.getAlbumAsync(ALBUM);
-    if (!album) await MediaLibrary.createAlbumAsync(ALBUM, asset, false);
-    else await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+    // new class-based media-library API (SDK 56)
+    const album = await Album.get(ALBUM);
+    if (album) await Asset.create(localUri, album); // create + add in one call
+    else await Album.create(ALBUM, [localUri]); // first time — make the album
   } catch {
     // gallery mirror is non-essential; the private copy is the record of truth
   }
@@ -38,7 +38,9 @@ export async function persistPhoto(cacheUri, ids) {
   try {
     const dir = `${PHOTO_DIR}${ids.clientId}/${ids.caseId}/${ids.sessionId}/`;
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-    const dest = `${dir}${ids.angleId}_${Date.now()}.jpg`;
+    // Deterministic path per (session, angle) — no timestamp; re-capture overwrites.
+    const dest = `${dir}${ids.angleId}.jpg`;
+    await FileSystem.deleteAsync(dest, { idempotent: true }); // copy fails if dest exists
     await FileSystem.copyAsync({ from: cacheUri, to: dest });
     mirrorToGallery(dest); // fire-and-forget so capture stays snappy
     return { uri: dest };

@@ -4,7 +4,9 @@ import { View, Pressable, StyleSheet, Image, ActivityIndicator } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFaceDetection } from '../data/faceDetection';
 import * as Haptics from 'expo-haptics';
+import { detectEyes } from '../data/eyes';
 import Svg, { Ellipse, Rect } from 'react-native-svg';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
@@ -36,6 +38,7 @@ export default function CameraScreen({ route }) {
   const isAfter = s.kind === 'after';
 
   const [permission, requestPermission] = useCameraPermissions();
+  const faceDetector = useFaceDetection();
   const camRef = React.useRef(null);
 
   const [idx, setIdx] = React.useState(params.startIdx || 0);
@@ -57,7 +60,8 @@ export default function CameraScreen({ route }) {
     }
     return cs.sessions.find((x) => x.kind === 'before') || cs.sessions[0];
   }, [cs, s]);
-  const ghostUri = overlayMode ? refSession?.photos[a.id]?.uri : null;
+  const refPhoto = overlayMode ? refSession?.photos[a.id] : null;
+  const ghostUri = refPhoto?.uri || null;
 
   React.useEffect(() => { requestPermission?.(); }, []); // eslint-disable-line
 
@@ -75,19 +79,30 @@ export default function CameraScreen({ route }) {
       uri = p?.uri;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) { /* simulator / no camera — continue without a real image */ }
-    // persist (copy to private storage + mirror to gallery) and use the stored uri
-    const rec = await store.capturePhoto(c.id, cs.id, s.id, a.id, { status: 'captured', uri, eyeHidden });
-    setShot({ aid: a.id, uri: rec?.uri ?? uri });
+    // Detect eyes once (on the cache file) so the review can preview redaction.
+    // Nothing is saved to disk/gallery/DB yet — that happens on Keep.
+    const eyes = await detectEyes(faceDetector, uri);
+    setShot({ aid: a.id, uri, ...eyes });
     setBusy(false);
   };
 
-  const keep = () => {
+  // Keep = commit: only now do we copy the file to private storage, mirror it to
+  // the gallery, and write the DB row — so discarded/retaken shots are never saved.
+  const keep = async () => {
+    if (busy) return;
+    setBusy(true);
+    await store.capturePhoto(c.id, cs.id, s.id, a.id, {
+      status: 'captured', uri: shot?.uri, eyeHidden,
+      eyeBoxes: shot?.eyeBoxes, eyeDetected: shot?.eyeDetected, imgW: shot?.imgW, imgH: shot?.imgH,
+    });
+    setBusy(false);
     setShot(null);
     const nm = nextMissing();
     if (nm !== undefined) setIdx(nm);
     else { toast('Session captured'); nav.navigateOrReplace('sessionReview', params); }
   };
-  const retake = () => { store.removePhoto(c.id, cs.id, s.id, a.id); setShot(null); };
+  // Retake = discard the pending shot. Nothing was persisted, so there's nothing to clean up.
+  const retake = () => setShot(null);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0c0f14' }}>
@@ -143,7 +158,7 @@ export default function CameraScreen({ route }) {
           {overlayMode && (
             <View style={{ position: 'absolute', bottom: 12, left: 12 }}>
               <View style={{ width: 56, borderRadius: 10, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)' }}>
-                <Photo eyeStyle={t.eyeStyle} uri={ghostUri} variant="plain" style={{ height: 70, borderRadius: 0, borderWidth: 0 }} />
+                <Photo eyeStyle={t.eyeStyle} uri={ghostUri} eyeBoxes={refPhoto?.eyeBoxes} imgW={refPhoto?.imgW} imgH={refPhoto?.imgH} variant="plain" style={{ height: 70, borderRadius: 0, borderWidth: 0 }} />
               </View>
               <Txt mono style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 3 }}>REFERENCE</Txt>
             </View>
@@ -201,7 +216,7 @@ export default function CameraScreen({ route }) {
               <Txt mono style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Captured · review</Txt>
             </View>
             <View style={{ flex: 1, paddingHorizontal: 20, justifyContent: 'center' }}>
-              <Photo angleCode={a.code} badge={isAfter ? 'AFTER' : 'BEFORE'} eyeHidden={eyeHidden} eyeStyle={t.eyeStyle} uri={shot.uri} corners variant="plain" style={{ width: '100%', height: '72%', borderRadius: 16 }} />
+              <Photo angleCode={a.code} badge={isAfter ? 'AFTER' : 'BEFORE'} eyeHidden={eyeHidden} eyeStyle={t.eyeStyle} uri={shot.uri} eyeBoxes={shot.eyeBoxes} imgW={shot.imgW} imgH={shot.imgH} corners variant="plain" style={{ width: '100%', height: '72%', borderRadius: 16 }} />
             </View>
             <View style={{ paddingHorizontal: 20, paddingBottom: 20, paddingTop: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
@@ -213,7 +228,7 @@ export default function CameraScreen({ route }) {
               </View>
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <Btn icon="retake" iconSize={18} label="Retake" onPress={retake} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'transparent' }} color="#fff" />
-                <Btn variant="primary" icon="check" iconSize={18} label={`Keep ${nextMissing() !== undefined ? '& next' : '& finish'}`} onPress={keep} style={{ flex: 2 }} />
+                <Btn variant="primary" icon="check" iconSize={18} disabled={busy} label={`Keep ${nextMissing() !== undefined ? '& next' : '& finish'}`} onPress={keep} style={{ flex: 2 }} />
               </View>
             </View>
           </SafeAreaView>

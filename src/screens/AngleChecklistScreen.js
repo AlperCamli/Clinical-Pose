@@ -53,7 +53,9 @@ export default function AngleChecklistScreen({ route }) {
             return (
               <Pressable key={a.id} onPress={() => nav.go('camera', { ...params, startIdx: i })}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, paddingHorizontal: PAD, borderTopWidth: i ? 1 : 0, borderTopColor: C.line }}>
-                <Photo eyeStyle={t.eyeStyle} uri={s.photos[a.id]?.uri} variant={st === 'captured' ? 'plain' : 'empty'} style={{ width: 46, height: 46 }} />
+                <Photo eyeStyle={t.eyeStyle} eyeHidden={s.photos[a.id]?.eyeHidden ?? true} uri={s.photos[a.id]?.uri}
+                  eyeBoxes={s.photos[a.id]?.eyeBoxes} imgW={s.photos[a.id]?.imgW} imgH={s.photos[a.id]?.imgH}
+                  variant={st === 'captured' ? 'plain' : 'empty'} style={{ width: 46, height: 46 }} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>{a.name}</Txt>
                   <Txt mono style={{ fontSize: 11, color: C.ink3, marginTop: 2 }}>{a.code}</Txt>

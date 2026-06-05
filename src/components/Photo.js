@@ -1,9 +1,11 @@
 // ============ NATURE — photo / face placeholder ============
-// Renders the abstract clinical "subject" silhouette with privacy eye-hide, or a
-// real captured image when `uri` is provided. Faithful to the .photo CSS block.
+// Renders the abstract clinical "subject" silhouette (no real image), or a real
+// captured image. For real images it draws a NON-DESTRUCTIVE eye redaction from
+// the stored normalized eye boxes (the original file is never modified).
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet, Image, Platform } from 'react-native';
 import Svg, { Defs, Pattern, Rect, Ellipse, LinearGradient, Stop, ClipPath } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 import Txt from './Txt';
 import { C, R_SM } from '../theme';
 
@@ -49,9 +51,37 @@ function Subject({ w, h, eyeHidden, eyeStyle, uid }) {
   );
 }
 
+// Map normalized boxes (0..1 of the image) to on-screen rects, accounting for the
+// `cover` crop of an imgW×imgH image inside a W×H container.
+function coverRects(boxes, W, H, imgW, imgH) {
+  if (!W || !H || !boxes?.length) return [];
+  if (imgW && imgH) {
+    const scale = Math.max(W / imgW, H / imgH);
+    const dispW = imgW * scale, dispH = imgH * scale;
+    const offX = (W - dispW) / 2, offY = (H - dispH) / 2;
+    return boxes.map((b) => ({ left: offX + b.x * dispW, top: offY + b.y * dispH, width: b.w * dispW, height: b.h * dispH }));
+  }
+  return boxes.map((b) => ({ left: b.x * W, top: b.y * H, width: b.w * W, height: b.h * H }));
+}
+
+function PixelRect({ rect, uid }) {
+  return (
+    <Svg style={{ position: 'absolute', left: rect.left, top: rect.top }} width={rect.width} height={rect.height}>
+      <Defs>
+        <Pattern id={`rpx-${uid}`} patternUnits="userSpaceOnUse" width={10} height={10}>
+          <Rect x={0} y={0} width={10} height={10} fill="#9aa4b1" />
+          <Rect x={0} y={0} width={5} height={5} fill="#717b89" />
+          <Rect x={5} y={5} width={5} height={5} fill="#717b89" />
+        </Pattern>
+      </Defs>
+      <Rect x={0} y={0} width={rect.width} height={rect.height} rx={6} fill={`url(#rpx-${uid})`} />
+    </Svg>
+  );
+}
+
 export default function Photo({
   uri, angleCode, badge, eyeHidden = true, eyeStyle = 'blur', variant = 'plain',
-  dim = false, style, corners = false, overlayLabel, children,
+  eyeBoxes, imgW, imgH, dim = false, style, corners = false, overlayLabel, children,
 }) {
   const flat = StyleSheet.flatten(style) || {};
   const radius = flat.borderRadius !== undefined ? flat.borderRadius : R_SM;
@@ -66,6 +96,9 @@ export default function Photo({
     ? { backgroundColor: C.surface2, borderWidth: 1.5, borderColor: C.line2, borderStyle: 'dashed' }
     : { backgroundColor: '#e7ecf2', borderWidth: 1, borderColor: C.line2 };
 
+  const redact = !empty && !!uri && eyeHidden && eyeBoxes?.length > 0;
+  const rects = redact ? coverRects(eyeBoxes, size.w, size.h, imgW, imgH) : [];
+
   return (
     <View
       onLayout={(e) => {
@@ -76,6 +109,25 @@ export default function Photo({
     >
       {!empty && uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
       {!empty && !uri && <Subject w={size.w} h={size.h} eyeHidden={eyeHidden} eyeStyle={eyeStyle} uid={uid} />}
+
+      {/* non-destructive eye redaction over a real image */}
+      {redact && rects.map((r, i) => {
+        if (eyeStyle === 'blur') {
+          return (
+            <BlurView
+              key={i}
+              intensity={Platform.OS === 'android' ? 90 : 60}
+              tint="light"
+              experimentalBlurMethod="dimezisBlurView"
+              style={{ position: 'absolute', left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, overflow: 'hidden' }}
+            />
+          );
+        }
+        if (eyeStyle === 'pixel') return <PixelRect key={i} rect={r} uid={`${uid}-${i}`} />;
+        return (
+          <View key={i} style={{ position: 'absolute', left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, backgroundColor: C.ink }} />
+        );
+      })}
 
       {corners && (
         <>

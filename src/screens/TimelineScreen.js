@@ -82,9 +82,14 @@ function SessionCard({ s, cs, c, t, nav }) {
           <Txt mono style={{ fontSize: 12, color: C.ink3 }}>{fmtDate(s.date)}</Txt>
         </Spread>
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
-          {reqAngles(cs.treatment).slice(0, 5).map((a) => (
-            <Photo key={a.id} eyeStyle={t.eyeStyle} uri={s.photos[a.id]?.uri} variant={s.photos[a.id]?.status === 'captured' ? 'plain' : 'empty'} style={{ flex: 1, height: 50 }} />
-          ))}
+          {reqAngles(cs.treatment).slice(0, 5).map((a) => {
+            const p = s.photos[a.id];
+            return (
+              <Photo key={a.id} eyeStyle={t.eyeStyle} eyeHidden={p?.eyeHidden ?? true} uri={p?.uri}
+                eyeBoxes={p?.eyeBoxes} imgW={p?.imgW} imgH={p?.imgH}
+                variant={p?.status === 'captured' ? 'plain' : 'empty'} style={{ flex: 1, height: 50 }} />
+            );
+          })}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 }}>
           <Icon name={missing ? 'bolt' : 'check'} size={12} color={missing ? C.warn : C.ok} />
