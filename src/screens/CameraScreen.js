@@ -16,6 +16,7 @@ import { Slider } from '../components/ui';
 import { C } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
+import { photoCaptured } from '../data/helpers';
 
 // dashed alignment guide (generic / fallback ghost)
 function GhostGuide() {
@@ -60,12 +61,12 @@ export default function CameraScreen({ route }) {
     return cs.sessions.find((x) => x.kind === 'before') || cs.sessions[0];
   }, [cs, s]);
   const refPhoto = overlayMode ? refSession?.photos[a.id] : null;
-  const ghostUri = refPhoto?.uri || null;
+  const ghostUri = photoCaptured(refPhoto) ? refPhoto?.uri : null;
 
   React.useEffect(() => { requestPermission?.(); }, []); // eslint-disable-line
 
   const nextMissing = () => {
-    const after = angles.map((_, i) => i).slice(idx + 1).find((i) => angles[i].req && s.photos[angles[i].id]?.status !== 'captured');
+    const after = angles.map((_, i) => i).slice(idx + 1).find((i) => angles[i].req && !photoCaptured(s.photos[angles[i].id]));
     return after;
   };
 

@@ -111,7 +111,11 @@ captured to complete a session; optional angles may be skipped.
 | `status`    | enum     | `captured` \| `missing` \| `retake` \| `optional` \| `skipped`. |
 | `eyeHidden` | boolean  | Whether the privacy display version hides the eyes. |
 | `tag`       | string?  | Optional grouping tag (`before` / `after`) used by seed data. |
-| `localUri`  | string?  | 🟡 path to the original file in the app's document dir. |
+| `localUri`  | string?  | 🟡 current runtime URI for the original file. Rebuilt from `photoKey` on launch. |
+| `photoKey`  | string?  | 🟡 stable relative key: `<clientId>/<caseId>/<sessionId>/<angleId>.jpg`. |
+| `galleryAssetId` | string? | 🟡 MediaLibrary asset id for recovering the private copy if the sandbox path changes. |
+| `galleryUri` | string? | 🟡 last known Gallery URI from the MediaLibrary asset. |
+| `fileMissing` | boolean | 🟡 true when the DB row exists but the private file could not be found or recovered. |
 | `remoteUrl` | string?  | 🟡 Supabase Storage URL once uploaded. |
 
 > The **eye-hide style** (`blur` \| `bar` \| `pixel`) is a clinic-wide display setting, not a
@@ -184,7 +188,11 @@ CREATE TABLE photos (
   angleId     TEXT NOT NULL,                    -- matches a protocol angle id
   status      TEXT NOT NULL DEFAULT 'captured', -- captured|missing|retake|optional|skipped
   eyeHidden   INTEGER NOT NULL DEFAULT 1,
-  localUri    TEXT,                             -- file in document dir
+  localUri    TEXT,                             -- current file URI
+  photoKey    TEXT,                             -- relative private-storage key
+  galleryAssetId TEXT,                          -- MediaLibrary recovery id
+  galleryUri  TEXT,                             -- last known Gallery URI
+  fileMissing INTEGER NOT NULL DEFAULT 0,
   remoteUrl   TEXT,                             -- Supabase Storage URL
   updatedAt   TEXT NOT NULL,
   dirty       INTEGER NOT NULL DEFAULT 1,
@@ -206,7 +214,8 @@ CREATE INDEX idx_clients_search  ON clients(name, code, phone);
 ```
 
 The repository hydrates the in-memory tree the screens already expect
-(`client.cases[].sessions[].photos{}`) by joining these tables, so **no screen code changes**.
+(`client.cases[].sessions[].photos{}`) by joining these tables. During hydration, photo storage is
+validated and repaired before the screens receive the graph.
 
 ---
 
@@ -219,17 +228,20 @@ Captured images are **binary files**, stored separately from the metadata above.
    ```
    <documentDirectory>/photos/<clientId>/<caseId>/<sessionId>/<angleId>.jpg
    ```
-   `photos.localUri` points here. The record never depends on a file the user could delete.
+   `photos.photoKey` stores the relative part, and `photos.localUri` is rebuilt from the current
+   `documentDirectory` at runtime.
 3. We **also mirror a copy into a "Nature" album** in the device gallery
-   (`expo-media-library`) for quick access — honoring the gallery preference without making the
-   record fragile.
-4. Eye-hidden / cropped **display versions are generated on demand** at export; originals are
+   (`expo-media-library`) and store the Gallery asset id as recovery metadata. If a later build sees
+   a stale or missing private URI, it restores the private copy from that Gallery asset when possible.
+4. If neither the private file nor Gallery asset can be resolved, the row is kept but marked
+   `fileMissing`, and capture/comparison flows treat that angle as needing recapture.
+5. Eye-hidden / cropped **display versions are generated on demand** at export; originals are
    never modified.
 
 > ⚠️ **PHI note:** photos mirrored to the device gallery auto-sync to iCloud/Google Photos and are
 > visible to anyone with the phone. The app-private copy (step 2) is what guarantees record
-> integrity and is what gets uploaded to Supabase; the gallery mirror (step 3) is a convenience and
-> can be turned off per clinic policy.
+> integrity and is what gets uploaded to Supabase; the gallery mirror (step 3) is a convenience,
+> but it also gives the app a local recovery path across app-container changes.
 
 ---
 

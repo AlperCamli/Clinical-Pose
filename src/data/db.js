@@ -3,6 +3,7 @@
 // backend (Phase 2 — Supabase) can sync without a migration.
 import * as SQLite from 'expo-sqlite';
 import { uid } from './helpers';
+import { recoverPhotoRecord } from './photos';
 
 let dbPromise;
 function getDB() {
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS photos (
   angleId TEXT NOT NULL,
   status TEXT, eyeHidden INTEGER, tag TEXT,
   localUri TEXT, remoteUrl TEXT,
+  photoKey TEXT, galleryAssetId TEXT, galleryUri TEXT, fileMissing INTEGER DEFAULT 0,
   eyeBoxes TEXT, eyeDetected INTEGER, imgW INTEGER, imgH INTEGER,
   createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
 );
@@ -55,10 +57,11 @@ CREATE INDEX IF NOT EXISTS idx_photos_session ON photos(sessionId);
 `;
 
 // Schema version. v1 recovered the corrupted seed (non-unique ids). v2 adds eye
-// redaction columns to `photos`, applied non-destructively via ALTER so any
-// photos already captured on-device are preserved.
-const DB_VERSION = 2;
+// redaction columns. v3 adds stable photo keys + gallery recovery metadata.
+// Additive migrations preserve photos already captured on-device.
+const DB_VERSION = 3;
 const V2_PHOTO_COLS = ['eyeBoxes TEXT', 'eyeDetected INTEGER', 'imgW INTEGER', 'imgH INTEGER'];
+const V3_PHOTO_COLS = ['photoKey TEXT', 'galleryAssetId TEXT', 'galleryUri TEXT', 'fileMissing INTEGER DEFAULT 0'];
 
 export async function initDB() {
   const db = await getDB();
@@ -80,6 +83,11 @@ export async function initDB() {
   // v1 → v2: add the redaction columns to existing photos tables (preserve data).
   if (current >= 1 && current < 2) {
     for (const col of V2_PHOTO_COLS) {
+      try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
+    }
+  }
+  if (current >= 1 && current < 3) {
+    for (const col of V3_PHOTO_COLS) {
       try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
     }
   }
@@ -138,15 +146,29 @@ export async function upsertPhoto(sessionId, angleId, rec, createdAt) {
   const boxes = rec.eyeBoxes != null ? JSON.stringify(rec.eyeBoxes) : null;
   await db.runAsync(
     `INSERT INTO photos (id, serverId, sessionId, angleId, status, eyeHidden, tag, localUri, remoteUrl,
+       photoKey, galleryAssetId, galleryUri, fileMissing,
        eyeBoxes, eyeDetected, imgW, imgH, createdAt, updatedAt, dirty)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
      ON CONFLICT(id) DO UPDATE SET
        status=excluded.status, eyeHidden=excluded.eyeHidden, tag=excluded.tag,
-       localUri=excluded.localUri, eyeBoxes=excluded.eyeBoxes, eyeDetected=excluded.eyeDetected,
+       localUri=excluded.localUri, remoteUrl=excluded.remoteUrl,
+       photoKey=excluded.photoKey, galleryAssetId=excluded.galleryAssetId,
+       galleryUri=excluded.galleryUri, fileMissing=excluded.fileMissing,
+       eyeBoxes=excluded.eyeBoxes, eyeDetected=excluded.eyeDetected,
        imgW=excluded.imgW, imgH=excluded.imgH, updatedAt=excluded.updatedAt, dirty=1`,
     [photoId(sessionId, angleId), rec.serverId ?? null, sessionId, angleId, rec.status ?? 'captured',
       rec.eyeHidden ? 1 : 0, rec.tag ?? null, rec.uri ?? null, rec.remoteUrl ?? null,
+      rec.photoKey ?? null, rec.galleryAssetId ?? null, rec.galleryUri ?? null, rec.fileMissing ? 1 : 0,
       boxes, rec.eyeDetected ? 1 : 0, rec.imgW ?? null, rec.imgH ?? null, createdAt ?? ts, ts]
+  );
+}
+
+async function updatePhotoStorage(photoRowId, rec) {
+  const db = await getDB();
+  await db.runAsync(
+    `UPDATE photos SET localUri=?, photoKey=?, galleryAssetId=?, galleryUri=?, fileMissing=?, updatedAt=?, dirty=1 WHERE id=?`,
+    [rec.uri ?? null, rec.photoKey ?? null, rec.galleryAssetId ?? null, rec.galleryUri ?? null,
+      rec.fileMissing ? 1 : 0, Date.now(), photoRowId]
   );
 }
 
@@ -203,14 +225,41 @@ export async function loadAll() {
     db.getAllAsync('SELECT * FROM photos'),
   ]);
 
+  const casesById = {};
+  for (const cs of caseRows) casesById[cs.id] = cs;
+  const sessionsById = {};
+  for (const s of sessionRows) sessionsById[s.id] = s;
+
   const photosBySession = {};
   for (const p of photoRows) {
     if (!photosBySession[p.sessionId]) photosBySession[p.sessionId] = {};
     let eyeBoxes;
     try { eyeBoxes = p.eyeBoxes ? JSON.parse(p.eyeBoxes) : undefined; } catch { eyeBoxes = undefined; }
+    const sRow = sessionsById[p.sessionId];
+    const csRow = sRow ? casesById[sRow.caseId] : null;
+    const storage = await recoverPhotoRecord({
+      uri: p.localUri || undefined,
+      photoKey: p.photoKey || undefined,
+      galleryAssetId: p.galleryAssetId || undefined,
+      galleryUri: p.galleryUri || undefined,
+      ids: csRow ? { clientId: csRow.clientId, caseId: csRow.id, sessionId: p.sessionId, angleId: p.angleId } : undefined,
+    });
+    if (
+      (storage.uri || null) !== (p.localUri || null) ||
+      (storage.photoKey || null) !== (p.photoKey || null) ||
+      (storage.galleryAssetId || null) !== (p.galleryAssetId || null) ||
+      (storage.galleryUri || null) !== (p.galleryUri || null) ||
+      (storage.fileMissing ? 1 : 0) !== (p.fileMissing ? 1 : 0)
+    ) {
+      await updatePhotoStorage(p.id, storage);
+    }
     photosBySession[p.sessionId][p.angleId] = {
       status: p.status, eyeHidden: !!p.eyeHidden, tag: p.tag || undefined,
-      uri: p.localUri || undefined, remoteUrl: p.remoteUrl || undefined,
+      uri: storage.uri || undefined, remoteUrl: p.remoteUrl || undefined,
+      photoKey: storage.photoKey || undefined,
+      galleryAssetId: storage.galleryAssetId || undefined,
+      galleryUri: storage.galleryUri || undefined,
+      fileMissing: !!storage.fileMissing,
       eyeBoxes, eyeDetected: !!p.eyeDetected, imgW: p.imgW || undefined, imgH: p.imgH || undefined,
     };
   }

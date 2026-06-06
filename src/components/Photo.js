@@ -98,7 +98,7 @@ function RedactionMark({ rect, style, uid }) {
 
 export default function Photo({
   uri, angleCode, badge, eyeHidden = true, eyeStyle = 'blur', variant = 'plain',
-  eyeBoxes, imgW, imgH, dim = false, style, corners = false, overlayLabel, children,
+  eyeBoxes, imgW, imgH, fileMissing = false, dim = false, style, corners = false, overlayLabel, children,
 }) {
   const flat = StyleSheet.flatten(style) || {};
   const radius = flat.borderRadius !== undefined ? flat.borderRadius : R_SM;
@@ -109,11 +109,12 @@ export default function Photo({
   const uid = React.useId().replace(/[:]/g, '');
 
   const empty = variant === 'empty';
+  const unavailable = !empty && fileMissing;
   const base = empty
     ? { backgroundColor: C.surface2, borderWidth: 1.5, borderColor: C.line2, borderStyle: 'dashed' }
     : { backgroundColor: '#e7ecf2', borderWidth: 1, borderColor: C.line2 };
 
-  const redact = !empty && !!uri && eyeHidden && eyeBoxes?.length > 0;
+  const redact = !empty && !unavailable && !!uri && eyeHidden && eyeBoxes?.length > 0;
   const rects = redact ? coverRects(eyeBoxes, size.w, size.h, imgW, imgH) : [];
 
   return (
@@ -124,8 +125,13 @@ export default function Photo({
       }}
       style={[{ overflow: 'hidden', borderRadius: radius }, base, flat]}
     >
-      {!empty && uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
-      {!empty && !uri && <Subject w={size.w} h={size.h} eyeHidden={eyeHidden} eyeStyle={eyeStyle} uid={uid} />}
+      {!empty && !unavailable && uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+      {!empty && !unavailable && !uri && <Subject w={size.w} h={size.h} eyeHidden={eyeHidden} eyeStyle={eyeStyle} uid={uid} />}
+      {unavailable && (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, backgroundColor: C.surface2 }]}>
+          <Txt mono style={{ fontSize: 9.5, fontWeight: '700', color: C.warn, textAlign: 'center' }}>PHOTO FILE MISSING</Txt>
+        </View>
+      )}
 
       {/* non-destructive eye redaction over a real image */}
       {redact && rects.map((r, i) => (

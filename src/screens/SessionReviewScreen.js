@@ -11,7 +11,7 @@ import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { defaultEyeBox } from '../data/eyeDefaults';
-import { fmtDate } from '../data/helpers';
+import { fmtDate, photoCaptured } from '../data/helpers';
 
 export default function SessionReviewScreen({ route }) {
   const params = route.params || {};
@@ -22,7 +22,7 @@ export default function SessionReviewScreen({ route }) {
   const s = cs.sessions.find((x) => x.id === params.sessionId);
   const angles = TREATMENTS[cs.treatment].angles;
   const reqd = angles.filter((a) => a.req);
-  const got = reqd.filter((a) => s.photos[a.id]?.status === 'captured').length;
+  const got = reqd.filter((a) => photoCaptured(s.photos[a.id])).length;
   const complete = got >= reqd.length;
   const hasBefore = cs.sessions.some((x) => x.kind === 'before' && x.id !== s.id) || s.kind === 'after';
 
@@ -56,7 +56,7 @@ export default function SessionReviewScreen({ route }) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11, marginBottom: 14 }}>
           {angles.map((a) => {
             const photo = s.photos[a.id];
-            const cap = photo?.status === 'captured';
+            const cap = photoCaptured(photo);
             const hidden = photo?.eyeHidden ?? true;
             return (
               <Card key={a.id} style={{ width: '47.8%', flexGrow: 1, overflow: 'hidden', padding: 0 }}>
@@ -64,8 +64,9 @@ export default function SessionReviewScreen({ route }) {
                   <Photo
                     angleCode={a.code} eyeHidden={hidden} eyeStyle={t.eyeStyle}
                     uri={photo?.uri} eyeBoxes={photo?.eyeBoxes} imgW={photo?.imgW} imgH={photo?.imgH}
-                    variant={cap ? 'plain' : 'empty'} style={{ height: 128, borderRadius: 0, borderWidth: 0 }}
-                    overlayLabel={!cap ? (
+                    fileMissing={photo?.fileMissing}
+                    variant={(cap || photo?.fileMissing) ? 'plain' : 'empty'} style={{ height: 128, borderRadius: 0, borderWidth: 0 }}
+                    overlayLabel={!cap && !photo?.fileMissing ? (
                       <>
                         <Icon name="camera" size={20} color={C.ink3} />
                         <Txt mono style={{ fontSize: 10, color: C.ink3 }}>{a.req ? 'TAP TO CAPTURE' : 'OPTIONAL'}</Txt>
@@ -75,14 +76,19 @@ export default function SessionReviewScreen({ route }) {
                 </Pressable>
                 <Spread style={{ paddingVertical: 9, paddingHorizontal: 11 }}>
                   <Txt style={{ fontSize: 12.5, fontWeight: '600' }}>{a.name}</Txt>
-                  {cap ? (
+                  {cap || photo?.fileMissing ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                      <Pressable onPress={() => openEdit(a)} hitSlop={10}>
-                        <Icon name="align" size={16} color={C.ink3} />
-                      </Pressable>
-                      <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
-                        <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
-                      </Pressable>
+                      {cap && (
+                        <>
+                          <Pressable onPress={() => openEdit(a)} hitSlop={10}>
+                            <Icon name="align" size={16} color={C.ink3} />
+                          </Pressable>
+                          <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
+                            <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
+                          </Pressable>
+                        </>
+                      )}
+                      {photo?.fileMissing && <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>FILE</Tag>}
                     </View>
                   ) : (a.req ? <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>!</Tag> : <Tag style={{ paddingVertical: 2, paddingHorizontal: 6 }}>OPT</Tag>)}
                 </Spread>

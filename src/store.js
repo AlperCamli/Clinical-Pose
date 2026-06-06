@@ -109,10 +109,12 @@ export function AppProvider({ children }) {
       capturePhoto: async (cid, caseId, sid, aid, data) => {
         const s = findSession(cid, caseId, sid);
         if (!s) return null;
-        const { uri } = await persistPhoto(data.uri, { clientId: cid, caseId, sessionId: sid, angleId: aid });
+        const saved = await persistPhoto(data.uri, { clientId: cid, caseId, sessionId: sid, angleId: aid });
         // eye geometry is normalized (0..1), so it survives the file copy unchanged
         const rec = {
-          status: data.status ?? 'captured', eyeHidden: data.eyeHidden, tag: data.tag, uri,
+          status: data.status ?? 'captured', eyeHidden: data.eyeHidden, tag: data.tag,
+          uri: saved.uri, photoKey: saved.photoKey, galleryAssetId: saved.galleryAssetId,
+          galleryUri: saved.galleryUri, fileMissing: false,
           eyeBoxes: data.eyeBoxes ?? [], eyeDetected: !!data.eyeDetected, imgW: data.imgW, imgH: data.imgH,
         };
         s.photos[aid] = rec;

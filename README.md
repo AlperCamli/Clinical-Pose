@@ -96,6 +96,10 @@ SQLite (nature.db)                         photo files
   consent_events  (clinical audit trail)
 ```
 
+Photo rows store a relative `photoKey` plus gallery recovery metadata, not only a one-time absolute
+`file://` path. On launch the app rebuilds the current private-storage URI from `photoKey`, validates
+that the file exists, and restores it from the Gallery asset when the app container path changed.
+
 Every row carries `serverId` / `updatedAt` / `dirty`, so **Phase 2 (Supabase sync)** can push dirty
 rows + upload photos without a schema migration. Needs your project URL / anon key + an auth decision.
 
@@ -145,13 +149,14 @@ re-detects. The gallery copy is **not** redacted (eyes-visible originals, by des
 ## Known limitations (MVP preview)
 
 - **Persistence is local-only (Phase 1).** Clients/cases/sessions/photos survive reloads via SQLite, and
-  captured photos persist to private storage + the gallery. Cloud sync (Supabase) is **Phase 2** — the
-  Sync screen still simulates the upload queue until that's wired.
+  captured photos persist to private storage + the gallery. Stored photo keys are relative, so builds
+  can rebuild the correct private URI when the app sandbox path changes. Cloud sync (Supabase) is
+  **Phase 2** — the Sync screen still simulates the upload queue until that's wired.
 - Abandoning a half-finished capture still leaves the just-created (empty) case/session behind, since the
   record is created on entry — a data-lifecycle item for the logic pass.
 - Photos are persisted only on **Keep** (capture is staged for review; Retake discards it), so discarded
-  shots never touch disk or the gallery. Files are named `{angleId}.jpg` (no timestamp); re-capturing an
-  angle overwrites its private file but leaves the previous gallery mirror (iOS prompts to delete assets).
+  shots never touch disk or the gallery. Private files are keyed by `{client}/{case}/{session}/{angle}.jpg`;
+  re-capturing an angle overwrites that private file but leaves the previous gallery mirror.
 - **Eye redaction is in-app only (this pass).** It's a non-destructive overlay from stored eye geometry;
   exported/shared social assets are **not** baked yet (deferred). Angles where ML Kit finds no eyes
   (profile, base view, crown) get no overlay. Overlay alignment under `cover` + EXIF/front-camera mirroring

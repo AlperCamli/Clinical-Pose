@@ -8,6 +8,7 @@ import { TopBar, ActionBar, Card, Tag, Btn, StatusTag, SecLabel } from '../compo
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
+import { photoCaptured } from '../data/helpers';
 
 export default function AngleChecklistScreen({ route }) {
   const params = route.params || {};
@@ -20,12 +21,12 @@ export default function AngleChecklistScreen({ route }) {
 
   const angles = TREATMENTS[cs.treatment].angles;
   const reqd = angles.filter((a) => a.req);
-  const got = reqd.filter((a) => s.photos[a.id]?.status === 'captured').length;
+  const got = reqd.filter((a) => photoCaptured(s.photos[a.id])).length;
   const isAfter = s.kind === 'after';
-  const firstMissing = angles.findIndex((a) => a.req && s.photos[a.id]?.status !== 'captured');
+  const firstMissing = angles.findIndex((a) => a.req && !photoCaptured(s.photos[a.id]));
 
   const statusOf = (a) => {
-    if (s.photos[a.id]?.status === 'captured') return 'captured';
+    if (photoCaptured(s.photos[a.id])) return 'captured';
     if (!a.req) return 'optional';
     return 'missing';
   };
@@ -55,7 +56,8 @@ export default function AngleChecklistScreen({ route }) {
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, paddingHorizontal: PAD, borderTopWidth: i ? 1 : 0, borderTopColor: C.line }}>
                 <Photo eyeStyle={t.eyeStyle} eyeHidden={s.photos[a.id]?.eyeHidden ?? true} uri={s.photos[a.id]?.uri}
                   eyeBoxes={s.photos[a.id]?.eyeBoxes} imgW={s.photos[a.id]?.imgW} imgH={s.photos[a.id]?.imgH}
-                  variant={st === 'captured' ? 'plain' : 'empty'} style={{ width: 46, height: 46 }} />
+                  fileMissing={s.photos[a.id]?.fileMissing}
+                  variant={(st === 'captured' || s.photos[a.id]?.fileMissing) ? 'plain' : 'empty'} style={{ width: 46, height: 46 }} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>{a.name}</Txt>
                   <Txt mono style={{ fontSize: 11, color: C.ink3, marginTop: 2 }}>{a.code}</Txt>
