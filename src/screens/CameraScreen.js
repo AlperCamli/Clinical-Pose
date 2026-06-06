@@ -4,13 +4,13 @@ import { View, Pressable, StyleSheet, Image, ActivityIndicator } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useFaceDetection } from '../data/faceDetection';
 import * as Haptics from 'expo-haptics';
-import { detectEyes } from '../data/eyes';
+import { defaultEyeBox } from '../data/eyeDefaults';
 import Svg, { Ellipse, Rect } from 'react-native-svg';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import Photo from '../components/Photo';
+import EyeBoxEditor from '../components/EyeBoxEditor';
 import { Btn, Tag, Chip } from '../components/ui';
 import { Slider } from '../components/ui';
 import { C } from '../theme';
@@ -38,7 +38,6 @@ export default function CameraScreen({ route }) {
   const isAfter = s.kind === 'after';
 
   const [permission, requestPermission] = useCameraPermissions();
-  const faceDetector = useFaceDetection();
   const camRef = React.useRef(null);
 
   const [idx, setIdx] = React.useState(params.startIdx || 0);
@@ -81,10 +80,16 @@ export default function CameraScreen({ route }) {
       uri = p?.uri;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) { /* simulator / no camera — continue without a real image */ }
-    // Detect eyes once (on the cache file) so the review can preview redaction.
-    // Nothing is saved to disk/gallery/DB yet — that happens on Keep.
-    const eyes = await detectEyes(faceDetector, uri);
-    setShot({ aid: a.id, uri, ...eyes });
+    // Seed the eye-cover from the angle's known overlay position (no ML). The
+    // doctor confirms/adjusts it in review; nothing is saved until Keep.
+    let imgW = 0, imgH = 0;
+    if (uri) {
+      const sz = await new Promise((res) =>
+        Image.getSize(uri, (w, h) => res({ w, h }), () => res({ w: 0, h: 0 })));
+      imgW = sz.w; imgH = sz.h;
+    }
+    const box = defaultEyeBox(a);
+    setShot({ aid: a.id, uri, eyeBoxes: box ? [box] : [], eyeDetected: !!box, imgW, imgH });
     setBusy(false);
   };
 
@@ -218,7 +223,15 @@ export default function CameraScreen({ route }) {
               <Txt mono style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Captured · review</Txt>
             </View>
             <View style={{ flex: 1, paddingHorizontal: 20, justifyContent: 'center' }}>
-              <Photo angleCode={a.code} badge={isAfter ? 'AFTER' : 'BEFORE'} eyeHidden={eyeHidden} eyeStyle={t.eyeStyle} uri={shot.uri} eyeBoxes={shot.eyeBoxes} imgW={shot.imgW} imgH={shot.imgH} corners variant="plain" style={{ width: '100%', height: '72%', borderRadius: 16 }} />
+              {shot.uri && eyeHidden && shot.eyeBoxes?.length > 0 ? (
+                <EyeBoxEditor
+                  uri={shot.uri} imgW={shot.imgW} imgH={shot.imgH} boxes={shot.eyeBoxes} eyeStyle={t.eyeStyle}
+                  onChange={(bs) => setShot((sh) => ({ ...sh, eyeBoxes: bs }))}
+                  style={{ width: '100%', height: '72%', borderRadius: 16, backgroundColor: '#e7ecf2' }}
+                />
+              ) : (
+                <Photo angleCode={a.code} badge={isAfter ? 'AFTER' : 'BEFORE'} eyeHidden={eyeHidden} eyeStyle={t.eyeStyle} uri={shot.uri} eyeBoxes={shot.eyeBoxes} imgW={shot.imgW} imgH={shot.imgH} corners variant="plain" style={{ width: '100%', height: '72%', borderRadius: 16 }} />
+              )}
             </View>
             <View style={{ paddingHorizontal: 20, paddingBottom: 20, paddingTop: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
@@ -229,21 +242,15 @@ export default function CameraScreen({ route }) {
                 </View>
               </View>
 
-              {/* detection feedback — tells the doctor why the eyes are / aren't hidden */}
-              {shot.uri && (
-                shot.eyeDetected ? (
-                  eyeHidden && (
-                    <Txt style={{ color: '#7fd49b', fontSize: 11.5, textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
-                      Eyes detected · hidden with {t.eyeStyle}
-                    </Txt>
-                  )
+              {/* manual eye-cover guidance */}
+              {shot.uri && eyeHidden && (
+                shot.eyeBoxes?.length > 0 ? (
+                  <Txt style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11.5, textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
+                    Drag to move · handles to resize · two fingers to rotate · ＋ add a block
+                  </Txt>
                 ) : (
                   <Txt style={{ color: '#ffb27f', fontSize: 11.5, textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
-                    {shot.status === 'unavailable'
-                      ? 'Auto-detection needs the dev client (not Expo Go) — eyes not hidden'
-                      : shot.status === 'no-face' || shot.status === 'no-eyes'
-                      ? 'No eyes found at this angle — eyes not hidden'
-                      : 'Eye-detection unavailable — eyes not hidden'}
+                    No eyes in this frame — nothing to hide
                   </Txt>
                 )
               )}

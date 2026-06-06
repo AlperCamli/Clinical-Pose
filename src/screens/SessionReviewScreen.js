@@ -5,10 +5,12 @@ import { Screen, ScrollBody, Spread } from '../components/Screen';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import Photo from '../components/Photo';
-import { TopBar, ActionBar, Card, Tag, Btn } from '../components/ui';
+import EyeBoxEditor from '../components/EyeBoxEditor';
+import { TopBar, ActionBar, Card, Tag, Btn, Sheet } from '../components/ui';
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
+import { defaultEyeBox } from '../data/eyeDefaults';
 import { fmtDate } from '../data/helpers';
 
 export default function SessionReviewScreen({ route }) {
@@ -23,6 +25,24 @@ export default function SessionReviewScreen({ route }) {
   const got = reqd.filter((a) => s.photos[a.id]?.status === 'captured').length;
   const complete = got >= reqd.length;
   const hasBefore = cs.sessions.some((x) => x.kind === 'before' && x.id !== s.id) || s.kind === 'after';
+
+  // "Adjust eyes" editor (re-position the saved eye cover for any captured photo)
+  const [editAid, setEditAid] = React.useState(null);
+  const [editBoxes, setEditBoxes] = React.useState([]);
+  const editPhoto = editAid ? s.photos[editAid] : null;
+  const openEdit = (a) => {
+    const p = s.photos[a.id];
+    const seed = p?.eyeBoxes?.length
+      ? p.eyeBoxes
+      : (defaultEyeBox(a) ? [defaultEyeBox(a)] : [{ x: 0.26, y: 0.36, w: 0.48, h: 0.12, rot: 0 }]);
+    setEditBoxes(seed);
+    setEditAid(a.id);
+  };
+  const saveEdit = () => {
+    store.setPhotoEyeBoxes(c.id, cs.id, s.id, editAid, editBoxes);
+    setEditAid(null);
+    toast('Eye position saved');
+  };
 
   return (
     <Screen>
@@ -56,9 +76,14 @@ export default function SessionReviewScreen({ route }) {
                 <Spread style={{ paddingVertical: 9, paddingHorizontal: 11 }}>
                   <Txt style={{ fontSize: 12.5, fontWeight: '600' }}>{a.name}</Txt>
                   {cap ? (
-                    <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
-                      <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                      <Pressable onPress={() => openEdit(a)} hitSlop={10}>
+                        <Icon name="align" size={16} color={C.ink3} />
+                      </Pressable>
+                      <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
+                        <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
+                      </Pressable>
+                    </View>
                   ) : (a.req ? <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>!</Tag> : <Tag style={{ paddingVertical: 2, paddingHorizontal: 6 }}>OPT</Tag>)}
                 </Spread>
               </Card>
@@ -85,6 +110,22 @@ export default function SessionReviewScreen({ route }) {
           }} style={{ flex: 1.4 }} />
         </View>
       </ActionBar>
+
+      <Sheet open={!!editAid} onClose={() => setEditAid(null)} title="Adjust eye cover">
+        {editAid && (
+          <View>
+            <EyeBoxEditor
+              uri={editPhoto?.uri} imgW={editPhoto?.imgW} imgH={editPhoto?.imgH}
+              boxes={editBoxes} eyeStyle={t.eyeStyle} onChange={setEditBoxes}
+              style={{ width: '100%', height: 300, borderRadius: 16, backgroundColor: '#e7ecf2', marginBottom: 10 }}
+            />
+            <Txt style={{ textAlign: 'center', color: C.ink3, fontSize: 12, marginBottom: 14 }}>
+              Drag to move · handles to resize · two fingers to rotate · ＋ add a block
+            </Txt>
+            <Btn variant="primary" icon="check" iconSize={18} label="Save eye position" onPress={saveEdit} />
+          </View>
+        )}
+      </Sheet>
     </Screen>
   );
 }

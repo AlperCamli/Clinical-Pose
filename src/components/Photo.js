@@ -8,11 +8,14 @@ import Svg, { Defs, Pattern, Rect, Ellipse, LinearGradient, Stop, ClipPath } fro
 import { BlurView } from 'expo-blur';
 import Txt from './Txt';
 import { C, R_SM } from '../theme';
+import { coverRects } from '../data/eyeGeometry';
+import { getStyle } from '../data/redactionStyles';
 
 function Subject({ w, h, eyeHidden, eyeStyle, uid }) {
   if (!w || !h) return null;
   const pid = `stripe-${uid}`;
   const gid = `subj-${uid}`;
+  const kind = getStyle(eyeStyle).kind;
   const eyeX = w * 0.24, eyeY = h * 0.34, eyeW = w * 0.52, eyeH = Math.max(8, h * 0.13);
   return (
     <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
@@ -28,8 +31,8 @@ function Subject({ w, h, eyeHidden, eyeStyle, uid }) {
       </Defs>
       <Rect x={0} y={0} width={w} height={h} fill={`url(#${pid})`} />
       <Ellipse cx={w * 0.5} cy={h * 0.54} rx={w * 0.26} ry={h * 0.37} fill={`url(#${gid})`} />
-      {eyeHidden && eyeStyle === 'bar' && <Rect x={eyeX} y={eyeY} width={eyeW} height={eyeH} rx={6} fill={C.ink} />}
-      {eyeHidden && eyeStyle === 'pixel' && (
+      {eyeHidden && kind === 'solid' && <Rect x={eyeX} y={eyeY} width={eyeW} height={eyeH} rx={6} fill={C.ink} />}
+      {eyeHidden && kind === 'pixel' && (
         <>
           <Defs>
             <Pattern id={`px-${uid}`} patternUnits="userSpaceOnUse" width={9} height={9}>
@@ -44,38 +47,52 @@ function Subject({ w, h, eyeHidden, eyeStyle, uid }) {
           <Rect x={eyeX} y={eyeY} width={eyeW} height={eyeH} fill={`url(#px-${uid})`} clipPath={`url(#pxc-${uid})`} />
         </>
       )}
-      {eyeHidden && eyeStyle !== 'bar' && eyeStyle !== 'pixel' && (
+      {eyeHidden && kind === 'blur' && (
         <Rect x={eyeX} y={eyeY} width={eyeW} height={eyeH} rx={6} fill="rgba(223,229,236,0.6)" stroke="rgba(255,255,255,0.5)" strokeWidth={1} />
       )}
     </Svg>
   );
 }
 
-// Map normalized boxes (0..1 of the image) to on-screen rects, accounting for the
-// `cover` crop of an imgW×imgH image inside a W×H container.
-function coverRects(boxes, W, H, imgW, imgH) {
-  if (!W || !H || !boxes?.length) return [];
-  if (imgW && imgH) {
-    const scale = Math.max(W / imgW, H / imgH);
-    const dispW = imgW * scale, dispH = imgH * scale;
-    const offX = (W - dispW) / 2, offY = (H - dispH) / 2;
-    return boxes.map((b) => ({ left: offX + b.x * dispW, top: offY + b.y * dispH, width: b.w * dispW, height: b.h * dispH }));
-  }
-  return boxes.map((b) => ({ left: b.x * W, top: b.y * H, width: b.w * W, height: b.h * H }));
-}
+// On-screen mapping (cover crop) lives in ../data/eyeGeometry so the editor and
+// the renderer agree. `coverRects` here returns rects with a `rot` passthrough.
 
-function PixelRect({ rect, uid }) {
+// One eye-cover block, rendered from a registry style def. `rect` is the on-screen
+// rect (incl. rotation) from coverRects; `style` is a redactionStyles entry.
+function RedactionMark({ rect, style, uid }) {
+  const radius = Math.min(rect.width, rect.height) * (style.radiusFactor ?? 0.3);
+  const wrap = {
+    position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    transform: [{ rotate: `${rect.rot || 0}deg` }],
+  };
+
+  if (style.kind === 'pixel') {
+    const cell = style.cell || 10;
+    return (
+      <Svg style={wrap} width={rect.width} height={rect.height}>
+        <Defs>
+          <Pattern id={`rpx-${uid}`} patternUnits="userSpaceOnUse" width={cell} height={cell}>
+            <Rect x={0} y={0} width={cell} height={cell} fill="#9aa4b1" />
+            <Rect x={0} y={0} width={cell / 2} height={cell / 2} fill="#717b89" />
+            <Rect x={cell / 2} y={cell / 2} width={cell / 2} height={cell / 2} fill="#717b89" />
+          </Pattern>
+        </Defs>
+        <Rect x={0} y={0} width={rect.width} height={rect.height} rx={radius} fill={`url(#rpx-${uid})`} />
+      </Svg>
+    );
+  }
+
+  if (style.kind === 'solid') {
+    return <View style={[wrap, { borderRadius: radius, backgroundColor: C.ink }]} />;
+  }
+
+  // blur: ONE uniform BlurView over the whole block, generously rounded so the
+  // edges read soft. expo-blur is a uniform effect (it can't truly feather without
+  // a native mask), so a single smooth layer beats stacking — no hard inner rect.
+  const intensity = Platform.OS === 'android' ? style.androidIntensity : style.iosIntensity;
   return (
-    <Svg style={{ position: 'absolute', left: rect.left, top: rect.top }} width={rect.width} height={rect.height}>
-      <Defs>
-        <Pattern id={`rpx-${uid}`} patternUnits="userSpaceOnUse" width={10} height={10}>
-          <Rect x={0} y={0} width={10} height={10} fill="#9aa4b1" />
-          <Rect x={0} y={0} width={5} height={5} fill="#717b89" />
-          <Rect x={5} y={5} width={5} height={5} fill="#717b89" />
-        </Pattern>
-      </Defs>
-      <Rect x={0} y={0} width={rect.width} height={rect.height} rx={6} fill={`url(#rpx-${uid})`} />
-    </Svg>
+    <BlurView intensity={intensity} tint={style.tint || 'light'} experimentalBlurMethod="dimezisBlurView"
+      style={[wrap, { borderRadius: radius, overflow: 'hidden' }]} />
   );
 }
 
@@ -111,23 +128,9 @@ export default function Photo({
       {!empty && !uri && <Subject w={size.w} h={size.h} eyeHidden={eyeHidden} eyeStyle={eyeStyle} uid={uid} />}
 
       {/* non-destructive eye redaction over a real image */}
-      {redact && rects.map((r, i) => {
-        if (eyeStyle === 'blur') {
-          return (
-            <BlurView
-              key={i}
-              intensity={Platform.OS === 'android' ? 100 : 85}
-              tint="light"
-              experimentalBlurMethod="dimezisBlurView"
-              style={{ position: 'absolute', left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, overflow: 'hidden' }}
-            />
-          );
-        }
-        if (eyeStyle === 'pixel') return <PixelRect key={i} rect={r} uid={`${uid}-${i}`} />;
-        return (
-          <View key={i} style={{ position: 'absolute', left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, backgroundColor: C.ink }} />
-        );
-      })}
+      {redact && rects.map((r, i) => (
+        <RedactionMark key={i} rect={r} style={getStyle(eyeStyle)} uid={`${uid}-${i}`} />
+      ))}
 
       {corners && (
         <>

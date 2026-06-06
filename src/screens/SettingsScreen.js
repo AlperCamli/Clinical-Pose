@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import { TopBar, Card, Switch, Segmented, SecLabel } from '../components/ui';
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
+import { REDACTION_OPTIONS } from '../data/redactionStyles';
 
 const row = { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, paddingHorizontal: PAD };
 
@@ -32,11 +33,9 @@ export default function SettingsScreen() {
 
         <SecLabel>Capture defaults</SecLabel>
         <Card style={{ marginBottom: 16 }}>
-          <View style={row}>
-            <View style={{ flex: 1 }}><Txt style={{ fontWeight: '600' }}>Default eye-hide style</Txt><Txt style={{ fontSize: 12, color: C.ink3 }}>Applied to display versions</Txt></View>
-            <View style={{ width: 170 }}>
-              <Segmented options={[{ v: 'blur', l: 'Blur' }, { v: 'bar', l: 'Bar' }, { v: 'pixel', l: 'Pixel' }]} value={t.eyeStyle} onChange={(v) => setTweak('eyeStyle', v)} />
-            </View>
+          <View style={{ paddingHorizontal: PAD, paddingTop: 13, paddingBottom: 13 }}>
+            <View style={{ marginBottom: 11 }}><Txt style={{ fontWeight: '600' }}>Default eye-hide style</Txt><Txt style={{ fontSize: 12, color: C.ink3 }}>Applied to display versions</Txt></View>
+            <Segmented options={REDACTION_OPTIONS} value={t.eyeStyle} onChange={(v) => setTweak('eyeStyle', v)} />
           </View>
           <View style={[row, { borderTopWidth: 1, borderTopColor: C.line }]}>
             <View style={{ flex: 1 }}><Txt style={{ fontWeight: '600' }}>Eyes hidden by default</Txt><Txt style={{ fontSize: 12, color: C.ink3 }}>Privacy-safe baseline</Txt></View>

@@ -128,6 +128,15 @@ export function AppProvider({ children }) {
         bump();
         save(upsertPhoto(sid, aid, rec));
       },
+      // persist a hand-adjusted eye box (normalized {x,y,w,h,rot}); re-renders instantly
+      setPhotoEyeBoxes: (cid, caseId, sid, aid, boxes) => {
+        const rec = findSession(cid, caseId, sid)?.photos[aid];
+        if (!rec) return;
+        rec.eyeBoxes = boxes || [];
+        rec.eyeDetected = !!(boxes && boxes.length);
+        bump();
+        save(upsertPhoto(sid, aid, rec));
+      },
       removePhoto: (cid, caseId, sid, aid) => {
         const s = findSession(cid, caseId, sid);
         if (!s) return;
