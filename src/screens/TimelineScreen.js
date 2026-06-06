@@ -88,7 +88,7 @@ function SessionCard({ s, cs, c, t, nav }) {
               <Photo key={a.id} eyeStyle={t.eyeStyle} eyeHidden={p?.eyeHidden ?? true} uri={p?.uri}
                 eyeBoxes={p?.eyeBoxes} imgW={p?.imgW} imgH={p?.imgH}
                 fileMissing={p?.fileMissing}
-                variant={p?.status === 'captured' ? 'plain' : 'empty'} style={{ flex: 1, height: 50 }} />
+                variant={(p?.status === 'captured' || p?.fileMissing) ? 'plain' : 'empty'} style={{ flex: 1, height: 50 }} />
             );
           })}
         </View>

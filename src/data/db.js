@@ -163,12 +163,17 @@ export async function upsertPhoto(sessionId, angleId, rec, createdAt) {
   );
 }
 
+// Repairs the device-local storage columns after recovery. These fields are
+// per-device — the absolute path changes between installs/builds — and carry no
+// meaning to the server, so this deliberately leaves `dirty`/`updatedAt` alone:
+// rebuilding a path must not enqueue the whole library for re-upload (Phase 2),
+// and an already-synced row must stay clean.
 async function updatePhotoStorage(photoRowId, rec) {
   const db = await getDB();
   await db.runAsync(
-    `UPDATE photos SET localUri=?, photoKey=?, galleryAssetId=?, galleryUri=?, fileMissing=?, updatedAt=?, dirty=1 WHERE id=?`,
+    `UPDATE photos SET localUri=?, photoKey=?, galleryAssetId=?, galleryUri=?, fileMissing=? WHERE id=?`,
     [rec.uri ?? null, rec.photoKey ?? null, rec.galleryAssetId ?? null, rec.galleryUri ?? null,
-      rec.fileMissing ? 1 : 0, Date.now(), photoRowId]
+      rec.fileMissing ? 1 : 0, photoRowId]
   );
 }
 
@@ -230,20 +235,32 @@ export async function loadAll() {
   const sessionsById = {};
   for (const s of sessionRows) sessionsById[s.id] = s;
 
-  const photosBySession = {};
-  for (const p of photoRows) {
-    if (!photosBySession[p.sessionId]) photosBySession[p.sessionId] = {};
-    let eyeBoxes;
-    try { eyeBoxes = p.eyeBoxes ? JSON.parse(p.eyeBoxes) : undefined; } catch { eyeBoxes = undefined; }
-    const sRow = sessionsById[p.sessionId];
-    const csRow = sRow ? casesById[sRow.caseId] : null;
-    const storage = await recoverPhotoRecord({
-      uri: p.localUri || undefined,
-      photoKey: p.photoKey || undefined,
-      galleryAssetId: p.galleryAssetId || undefined,
-      galleryUri: p.galleryUri || undefined,
-      ids: csRow ? { clientId: csRow.clientId, caseId: csRow.id, sessionId: p.sessionId, angleId: p.angleId } : undefined,
-    });
+  // Recover/repair each photo's on-disk storage. Recovery is per-file and
+  // independent, so the file I/O runs in bounded-concurrency batches rather than
+  // one-at-a-time (this is on the cold-start critical path and gates first paint).
+  // The resulting DB writes are applied sequentially afterwards so we never issue
+  // concurrent writes on the single SQLite connection.
+  const RECOVER_BATCH = 8;
+  const recovered = [];
+  for (let i = 0; i < photoRows.length; i += RECOVER_BATCH) {
+    const batch = await Promise.all(photoRows.slice(i, i + RECOVER_BATCH).map(async (p) => {
+      let eyeBoxes;
+      try { eyeBoxes = p.eyeBoxes ? JSON.parse(p.eyeBoxes) : undefined; } catch { eyeBoxes = undefined; }
+      const sRow = sessionsById[p.sessionId];
+      const csRow = sRow ? casesById[sRow.caseId] : null;
+      const storage = await recoverPhotoRecord({
+        uri: p.localUri || undefined,
+        photoKey: p.photoKey || undefined,
+        galleryAssetId: p.galleryAssetId || undefined,
+        galleryUri: p.galleryUri || undefined,
+        ids: csRow ? { clientId: csRow.clientId, caseId: csRow.id, sessionId: p.sessionId, angleId: p.angleId } : undefined,
+      });
+      return { p, eyeBoxes, storage };
+    }));
+    recovered.push(...batch);
+  }
+
+  for (const { p, storage } of recovered) {
     if (
       (storage.uri || null) !== (p.localUri || null) ||
       (storage.photoKey || null) !== (p.photoKey || null) ||
@@ -253,6 +270,11 @@ export async function loadAll() {
     ) {
       await updatePhotoStorage(p.id, storage);
     }
+  }
+
+  const photosBySession = {};
+  for (const { p, eyeBoxes, storage } of recovered) {
+    if (!photosBySession[p.sessionId]) photosBySession[p.sessionId] = {};
     photosBySession[p.sessionId][p.angleId] = {
       status: p.status, eyeHidden: !!p.eyeHidden, tag: p.tag || undefined,
       uri: storage.uri || undefined, remoteUrl: p.remoteUrl || undefined,
