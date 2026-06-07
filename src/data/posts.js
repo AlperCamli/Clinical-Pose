@@ -1,0 +1,19 @@
+// ============ NATURE — social post export to gallery ============
+// The composed social asset is a snapshot of <PostPreview> — already redacted and
+// consent-gated — so it's safe to save to the gallery. We keep it in its OWN album,
+// separate from the clinical originals mirrored by photos.js.
+import { Asset, Album, requestPermissionsAsync } from 'expo-media-library';
+
+const POST_ALBUM = 'Nature Posts';
+
+// Save one rendered asset file (file:// uri) into the "Nature Posts" album.
+// Throws 'no-media-permission' if the user declines the gallery permission.
+export async function savePostToGallery(fileUri) {
+  if (!fileUri) throw new Error('no-file');
+  const res = await requestPermissionsAsync();
+  if (!res?.granted) throw new Error('no-media-permission');
+  // SDK-56 class-based media-library API (same as photos.js)
+  const album = await Album.get(POST_ALBUM);
+  if (album) await Asset.create(fileUri, album); // create + add in one call
+  else await Album.create(POST_ALBUM, [fileUri]); // first time — make the album
+}

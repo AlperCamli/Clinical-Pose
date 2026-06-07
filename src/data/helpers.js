@@ -17,6 +17,16 @@ export function reqAngles(tid) {
 export function photoCaptured(photo) {
   return photo?.status === 'captured' && !photo.fileMissing;
 }
+// Sessions (oldest → newest) that actually captured a given angle — the pool of
+// images available to Compare and the social-post builder.
+export function capturedSessions(cs, angleId) {
+  return cs.sessions.filter((s) => photoCaptured(s.photos[angleId]));
+}
+// Default before/after for an angle: earliest captured = before, latest = after.
+export function beforeAfter(cs, angleId) {
+  const ss = capturedSessions(cs, angleId);
+  return { before: ss[0], after: ss[ss.length - 1] };
+}
 export function capCount(session, tid) {
   const reqd = reqAngles(tid);
   const got = reqd.filter((a) => photoCaptured(session.photos[a.id])).length;

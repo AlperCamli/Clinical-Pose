@@ -9,7 +9,7 @@ import { TopBar, ActionBar, Card, Chip, Tag, Segmented, Btn, IconBtn, SecLabel }
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
-import { reqAngles, fmtDate, photoCaptured } from '../data/helpers';
+import { reqAngles, fmtDate, capturedSessions } from '../data/helpers';
 
 function AngleLabel({ text, ok, right }) {
   return (
@@ -49,7 +49,7 @@ export default function CompareScreen({ route }) {
   // sessions that actually captured this angle = the pool of images to compare
   const photoOf = (s) => s.photos[angleId];
   const avail = React.useMemo(
-    () => (cs ? cs.sessions.filter((s) => photoCaptured(photoOf(s))) : []),
+    () => (cs ? capturedSessions(cs, angleId) : []),
     [cs, angleId]
   );
   // spread a session's stored photo props into <Photo …> (uri + eye geometry)

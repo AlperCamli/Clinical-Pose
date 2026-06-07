@@ -8,7 +8,7 @@ import Photo from '../components/Photo';
 import { ActionBar, Card, Btn, Segmented, SecLabel } from '../components/ui';
 import { C } from '../theme';
 import { useApp, useNav } from '../store';
-import { reqAngles } from '../data/helpers';
+import { reqAngles, beforeAfter, fmtDate } from '../data/helpers';
 
 export default function PostSelectScreen({ route }) {
   const params = route.params || {};
@@ -20,6 +20,10 @@ export default function PostSelectScreen({ route }) {
   const [sel, setSel] = React.useState([angles[0].id]);
   const [mode, setMode] = React.useState('single');
   const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const ph = (s, aid) => {
+    const p = s?.photos?.[aid];
+    return { uri: p?.uri, eyeBoxes: p?.eyeBoxes, imgW: p?.imgW, imgH: p?.imgH, fileMissing: p?.fileMissing };
+  };
 
   return (
     <Wizard step={0} title="Select photos" sub="Best before / after pairs"
@@ -31,15 +35,17 @@ export default function PostSelectScreen({ route }) {
       <View style={{ gap: 11, marginBottom: 16 }}>
         {angles.map((a) => {
           const on = sel.includes(a.id);
+          const { before, after } = beforeAfter(cs, a.id);
+          const range = before && after ? `${fmtDate(before.date)} → ${fmtDate(after.date)}` : 'BEFORE → AFTER';
           return (
             <Card key={a.id} onPress={() => toggle(a.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: on ? 1.5 : 1, borderColor: on ? C.accent : C.line }}>
               <View style={{ flexDirection: 'row', gap: 4 }}>
-                <Photo eyeStyle={t.eyeStyle} variant="plain" style={{ width: 48, height: 60 }} />
-                <Photo eyeStyle={t.eyeStyle} variant="plain" style={{ width: 48, height: 60 }} />
+                <Photo eyeStyle={t.eyeStyle} {...ph(before, a.id)} variant="plain" style={{ width: 48, height: 60 }} />
+                <Photo eyeStyle={t.eyeStyle} {...ph(after, a.id)} variant="plain" style={{ width: 48, height: 60 }} />
               </View>
               <View style={{ flex: 1 }}>
                 <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>{a.name}</Txt>
-                <Txt mono style={{ fontSize: 11, color: C.ink3 }}>BEFORE → AFTER</Txt>
+                <Txt mono style={{ fontSize: 11, color: C.ink3 }}>{range}</Txt>
               </View>
               <View style={{ width: 24, height: 24, borderRadius: 8, borderWidth: 2, borderColor: on ? C.accent : C.line2, backgroundColor: on ? C.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                 {on && <Icon name="check" size={15} color="#fff" />}

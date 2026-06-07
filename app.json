@@ -53,7 +53,8 @@
           "isAccessMediaLocationEnabled": false
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-sharing"
     ]
   }
 }
