@@ -153,7 +153,7 @@ function PostRow({ c, cs, post, t, first, nav }) {
       onPress={() => nav.go('postDetail', { cid: c.id, caseId: cs.id, postId: post.id })}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: PAD, borderTopWidth: first ? 0 : 1, borderTopColor: C.line }}
     >
-      <PostPreview cfg={postToSlideCfg(post, 0)} t={t} c={c} cs={cs} size={post.format === '9:16' ? 40 : 52} />
+      <PostPreview cfg={postToSlideCfg(post, 0)} t={t} c={c} cs={cs} size={post.format === '9:16' ? 40 : 52} bare />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Txt style={{ fontWeight: '600', fontSize: 14.5 }} numberOfLines={1}>{c.name}</Txt>

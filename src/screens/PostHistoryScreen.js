@@ -38,7 +38,7 @@ export default function PostHistoryScreen({ route }) {
               return (
                 <Card key={post.id} onPress={() => nav.go('postDetail', { cid: c.id, caseId: cs.id, postId: post.id })}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 12 }}>
-                  <PostPreview cfg={postToSlideCfg(post, 0)} t={t} c={c} cs={cs} size={post.format === '9:16' ? 56 : 72} />
+                  <PostPreview cfg={postToSlideCfg(post, 0)} t={t} c={c} cs={cs} size={post.format === '9:16' ? 56 : 72} bare />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Txt style={{ fontWeight: '700', fontSize: 15, textTransform: 'capitalize' }}>{post.mode || 'single'}</Txt>

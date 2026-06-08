@@ -15,7 +15,9 @@ import { fmtDate, TODAY, reqAngles, beforeAfter, capturedSessions } from '../dat
 
 const RATIO = { '1:1': 1, '4:5': 0.8, '9:16': 0.5625 };
 
-export default function PostPreview({ cfg, t, c, cs, size }) {
+// `bare` strips every text overlay (BEFORE/AFTER labels, disclaimer, meta + logo)
+// so tiny list thumbnails show only the photos.
+export default function PostPreview({ cfg, t, c, cs, size, bare }) {
   if (!cs) return null;
   const ratio = RATIO[cfg.format] || 1;
   const W = size || 260;
@@ -45,11 +47,11 @@ export default function PostPreview({ cfg, t, c, cs, size }) {
         <View style={{ flexDirection: 'row', height: '100%', gap: 2 }}>
           <View style={{ flex: 1 }}>
             <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(before)} variant="plain" style={photoStyle} />
-            <Label text="BEFORE" />
+            {!bare && <Label text="BEFORE" />}
           </View>
           <View style={{ flex: 1 }}>
             <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={photoStyle} />
-            <Label text="AFTER" ok />
+            {!bare && <Label text="AFTER" ok />}
           </View>
         </View>
       )}
@@ -61,8 +63,8 @@ export default function PostPreview({ cfg, t, c, cs, size }) {
             <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={{ ...photoStyle, position: 'absolute', right: 0, width: W }} />
           </View>
           <View style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, backgroundColor: '#fff' }} />
-          <Label text="BEFORE" />
-          <View style={{ position: 'absolute', right: 6, top: 6 }}><Label text="AFTER" ok inline /></View>
+          {!bare && <Label text="BEFORE" />}
+          {!bare && <View style={{ position: 'absolute', right: 6, top: 6 }}><Label text="AFTER" ok inline /></View>}
         </View>
       )}
       {tmpl === 'timeline' && (
@@ -76,29 +78,31 @@ export default function PostPreview({ cfg, t, c, cs, size }) {
       )}
       {tmpl === 'single' && <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={photoStyle} />}
 
-      {cfg.privacy?.disclaimer && (
+      {!bare && cfg.privacy?.disclaimer && (
         <View style={{ position: 'absolute', top: 8, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.35)', paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 }}>
           <Txt mono style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)' }}>INDIVIDUAL RESULTS VARY</Txt>
         </View>
       )}
 
       {/* meta + logo */}
-      <LinearGradient colors={['transparent', 'rgba(12,16,22,0.62)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1 }}>
-          {cfg.privacy?.name && <Txt style={{ fontWeight: '700', fontSize: 13, color: '#fff' }}>{c.name}</Txt>}
-          {cfg.privacy?.treatment && <Txt mono style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{TREATMENTS[cs.treatment].name}</Txt>}
-          {cfg.privacy?.doctor && cs.practitioner && <Txt mono style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.7)' }}>{cs.practitioner}</Txt>}
-          {cfg.privacy?.date && <Txt mono style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDate(dateFrom)} → {fmtDate(dateTo)}</Txt>}
-        </View>
-        {cfg.privacy?.logo !== false && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <View style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="camera" size={9} color="#fff" />
-            </View>
-            <Txt style={{ fontWeight: '700', fontSize: 11, color: '#fff' }}>Nature</Txt>
+      {!bare && (
+        <LinearGradient colors={['transparent', 'rgba(12,16,22,0.62)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            {cfg.privacy?.name && <Txt style={{ fontWeight: '700', fontSize: 13, color: '#fff' }}>{c.name}</Txt>}
+            {cfg.privacy?.treatment && <Txt mono style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{TREATMENTS[cs.treatment].name}</Txt>}
+            {cfg.privacy?.doctor && cs.practitioner && <Txt mono style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.7)' }}>{cs.practitioner}</Txt>}
+            {cfg.privacy?.date && <Txt mono style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDate(dateFrom)} → {fmtDate(dateTo)}</Txt>}
           </View>
-        )}
-      </LinearGradient>
+          {cfg.privacy?.logo !== false && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="camera" size={9} color="#fff" />
+              </View>
+              <Txt style={{ fontWeight: '700', fontSize: 11, color: '#fff' }}>Nature</Txt>
+            </View>
+          )}
+        </LinearGradient>
+      )}
     </View>
   );
 }
