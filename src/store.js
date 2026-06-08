@@ -6,7 +6,7 @@ import { SEED_CLIENTS } from './data/seed';
 import { C } from './theme';
 import {
   initDB, seedIfEmpty, loadAll,
-  upsertClient, upsertCaseGraph, upsertSession, upsertPhoto, deletePhotoRow, addConsentEvent,
+  upsertClient, upsertCaseGraph, upsertSession, upsertPhoto, deletePhotoRow, addConsentEvent, upsertPost,
 } from './data/db';
 import { persistPhoto, deletePhotoFile } from './data/photos';
 
@@ -147,6 +147,23 @@ export function AppProvider({ children }) {
         bump();
         save(deletePhotoRow(sid, aid));
         deletePhotoFile(rec?.uri);
+      },
+      // ---- social posts ----
+      addPost: (cid, caseId, post) => {
+        const cs = findCase(cid, caseId);
+        if (!cs) return;
+        if (!cs.posts) cs.posts = [];
+        cs.posts.unshift(post);
+        bump();
+        save(upsertPost(caseId, post));
+      },
+      markPostShared: (cid, caseId, postId) => {
+        const post = findCase(cid, caseId)?.posts?.find((p) => p.id === postId);
+        if (!post) return;
+        post.status = 'shared';
+        post.sharedAt = Date.now();
+        bump();
+        save(upsertPost(caseId, post));
       },
     };
   }, [bump]);

@@ -10,6 +10,8 @@ import { C } from '../theme';
 import { useApp, useNav } from '../store';
 import { reqAngles, beforeAfter, fmtDate } from '../data/helpers';
 
+const SIZE_LABEL = { '1:1': 'Square 1:1', '4:5': 'Portrait 4:5 (Recommended)', '9:16': 'Story 9:16' };
+
 export default function PostSelectScreen({ route }) {
   const params = route.params || {};
   const { store, t } = useApp();
@@ -19,6 +21,7 @@ export default function PostSelectScreen({ route }) {
   const angles = reqAngles(cs.treatment);
   const [sel, setSel] = React.useState([angles[0].id]);
   const [mode, setMode] = React.useState('single');
+  const [format, setFormat] = React.useState('4:5');
   const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const ph = (s, aid) => {
     const p = s?.photos?.[aid];
@@ -26,8 +29,8 @@ export default function PostSelectScreen({ route }) {
   };
 
   return (
-    <Wizard step={0} title="Select photos" sub="Best before / after pairs"
-      footer={<ActionBar><Btn variant="primary" lg block disabled={!sel.length} label="Next · format" onPress={() => nav.go('postFormat', { ...params, cfg: { sel, mode } })} /></ActionBar>}>
+    <Wizard step={0} total={3} title="Select photos" sub="Best before / after pairs"
+      footer={<ActionBar><Btn variant="primary" lg block disabled={!sel.length} label="Next · template" onPress={() => nav.go('postTemplate', { ...params, cfg: { sel, mode, format } })} /></ActionBar>}>
       <View style={{ flexDirection: 'row', gap: 7, marginHorizontal: 3, marginBottom: 12 }}>
         <Icon name="sparkle" size={15} color={C.accent} style={{ marginTop: 1 }} />
         <Txt style={{ flex: 1, fontSize: 12.5, color: C.ink3 }}>Suggested pairs are matched by angle automatically.</Txt>
@@ -55,7 +58,14 @@ export default function PostSelectScreen({ route }) {
         })}
       </View>
       <SecLabel>Layout</SecLabel>
-      <Segmented options={[{ v: 'single', l: 'Single' }, { v: 'carousel', l: 'Carousel' }, { v: 'timeline', l: 'Timeline' }]} value={mode} onChange={setMode} />
+      <Segmented options={[{ v: 'single', l: 'Single' }, { v: 'carousel', l: 'Carousel' }, { v: 'story', l: 'Story' }]} value={mode} onChange={setMode} />
+      <Card onPress={() => nav.go('postFormat', { ...params, cfg: { sel, mode, format }, onPick: setFormat })}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, marginTop: 11 }}>
+        <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>Select Size</Txt>
+        <View style={{ flex: 1 }} />
+        <Txt style={{ fontSize: 13, color: C.accentInk, fontWeight: '600' }}>{SIZE_LABEL[format]}</Txt>
+        <Icon name="chevR" size={17} color={C.ink3} />
+      </Card>
     </Wizard>
   );
 }

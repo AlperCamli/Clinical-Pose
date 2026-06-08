@@ -5,15 +5,18 @@ import { Screen, ScrollBody, Spread } from '../components/Screen';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import TGlyph from '../components/TGlyph';
+import PostPreview from '../components/PostPreview';
 import { Card, Avatar, Tag, SecLabel, IconBtn } from '../components/ui';
 import { C, PAD, shadowBtn } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { RECENT } from '../data/seed';
-import { capCount, fmtDate } from '../data/helpers';
+import { capCount, fmtDate, postToSlideCfg } from '../data/helpers';
+
+const fmtTs = (ts) => (ts ? new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '');
 
 export default function HomeScreen() {
-  const { store } = useApp();
+  const { store, t } = useApp();
   const nav = useNav();
 
   const active = [];
@@ -23,6 +26,13 @@ export default function HomeScreen() {
       active.push({ c, cs, last: cs.sessions[cs.sessions.length - 1] });
     })
   );
+
+  const socialPosts = [];
+  store.clients.forEach((c) =>
+    c.cases.forEach((cs) => (cs.posts || []).forEach((post) => socialPosts.push({ c, cs, post })))
+  );
+  socialPosts.sort((a, b) => (b.post.createdAt || 0) - (a.post.createdAt || 0));
+  const recentPosts = socialPosts.slice(0, 4);
 
   const startCase = () => nav.go('treatmentPicker', {});
   const findClient = () => nav.go('clientSearch', { mode: 'find' });
@@ -86,6 +96,20 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Recent social media contents */}
+        <View style={{ paddingHorizontal: PAD, paddingTop: 16, paddingBottom: 6 }}>
+          <SecLabel>Recent Social Media Contents</SecLabel>
+          {recentPosts.length === 0 ? (
+            <Card pad>
+              <Txt style={{ fontSize: 12.5, color: C.ink3 }}>Posts you create from a case will appear here — both shared and ready to share.</Txt>
+            </Card>
+          ) : (
+            <Card>
+              {recentPosts.map(({ c, cs, post }, i) => <PostRow key={post.id} c={c} cs={cs} post={post} t={t} first={i === 0} nav={nav} />)}
+            </Card>
+          )}
+        </View>
+
         {/* Recent sessions */}
         <View style={{ paddingHorizontal: PAD, paddingTop: 14, paddingBottom: 22 }}>
           <SecLabel>Recent sessions</SecLabel>
@@ -119,6 +143,26 @@ function ActiveCard({ c, cs, last, nav }) {
         <Icon name="chevR" size={17} color={C.ink3} />
       </View>
     </Card>
+  );
+}
+
+function PostRow({ c, cs, post, t, first, nav }) {
+  const shared = post.status === 'shared';
+  return (
+    <Pressable
+      onPress={() => nav.go('postDetail', { cid: c.id, caseId: cs.id, postId: post.id })}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: PAD, borderTopWidth: first ? 0 : 1, borderTopColor: C.line }}
+    >
+      <PostPreview cfg={postToSlideCfg(post, 0)} t={t} c={c} cs={cs} size={post.format === '9:16' ? 40 : 52} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Txt style={{ fontWeight: '600', fontSize: 14.5 }} numberOfLines={1}>{c.name}</Txt>
+          <Tag variant={shared ? 'ok' : 'accent'} dot>{shared ? 'Shared' : 'Ready'}</Tag>
+        </View>
+        <Txt style={{ fontSize: 12, color: C.ink3 }} numberOfLines={1}>{TREATMENTS[cs.treatment].name} · {post.mode || 'single'}</Txt>
+      </View>
+      <Txt mono style={{ fontSize: 11.5, color: C.ink3 }}>{fmtTs(shared ? post.sharedAt : post.createdAt)}</Txt>
+    </Pressable>
   );
 }
 

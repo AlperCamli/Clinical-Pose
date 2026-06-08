@@ -43,6 +43,19 @@ export default function TimelineScreen({ route }) {
           <Tag>{`${cs.sessions.length} sess.`}</Tag>
         </Card>
 
+        <Card onPress={() => nav.go('postHistory', { cid: c.id, caseId: cs.id })}
+          style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.accentWash, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="image" size={19} color={C.accentInk} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>Social media posts</Txt>
+            <Txt style={{ fontSize: 12, color: C.ink3 }}>Shared & ready-to-share content</Txt>
+          </View>
+          <Tag>{String((cs.posts || []).length)}</Tag>
+          <Icon name="chevR" size={17} color={C.ink3} />
+        </Card>
+
         <Spread style={{ marginHorizontal: 3, marginBottom: 12 }}>
           <SecLabel style={{ margin: 0 }}>Session history</SecLabel>
           <Txt style={{ fontSize: 12, color: C.ink3 }}>oldest → newest</Txt>

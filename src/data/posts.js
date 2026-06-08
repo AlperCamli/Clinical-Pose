@@ -3,8 +3,21 @@
 // consent-gated — so it's safe to save to the gallery. We keep it in its OWN album,
 // separate from the clinical originals mirrored by photos.js.
 import { Asset, Album, requestPermissionsAsync } from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 
 const POST_ALBUM = 'Nature Posts';
+
+// Share rendered post files via the system sheet. A post can be multi-slide
+// (carousel); the share sheet takes one file, so we share the first and rely on
+// the caller having saved the full set to the gallery. Returns false if sharing
+// is unavailable on the platform.
+export async function sharePost(uris) {
+  const first = Array.isArray(uris) ? uris[0] : uris;
+  if (!first) throw new Error('no-file');
+  if (!(await Sharing.isAvailableAsync())) return false;
+  await Sharing.shareAsync(first, { mimeType: 'image/jpeg', dialogTitle: 'Share post' });
+  return true;
+}
 
 // Save one rendered asset file (file:// uri) into the "Nature Posts" album.
 // Throws 'no-media-permission' if the user declines the gallery permission.

@@ -38,3 +38,34 @@ export function uid() {
 export function clone(x) {
   return JSON.parse(JSON.stringify(x));
 }
+
+// ---------------- social posts ----------------
+// Privacy-safe defaults for a single post photo (mirrors PostPrivacyScreen).
+export const DEFAULT_POST_PRIVACY = {
+  eyes: 'hidden', name: false, treatment: true, date: true, logo: true, doctor: false, disclaimer: true,
+};
+
+// Resolve a wizard cfg (with per-angle template/privacy maps) into a FLAT cfg for
+// one angle, which is what <PostPreview> consumes.
+export function slideCfg(cfg, angleId) {
+  return {
+    ...cfg,
+    sel: [angleId],
+    template: cfg.templates?.[angleId] ?? 'split',
+    privacy: cfg.privacy?.[angleId] ?? DEFAULT_POST_PRIVACY,
+  };
+}
+
+// Expand a cfg into the share queue: carousel = one post holding every angle as a
+// slide; single/story = one post per selected angle.
+export function buildQueue(cfg) {
+  const ids = cfg.sel?.length ? cfg.sel : [];
+  if (cfg.mode === 'carousel') return [{ angles: ids }];
+  return ids.map((a) => ({ angles: [a] }));
+}
+
+// Flat cfg for slide `i` of a stored post record (for previews / re-render).
+export function postToSlideCfg(post, i = 0) {
+  const s = post.slides?.[i] || post.slides?.[0] || {};
+  return { format: post.format, sel: s.angleId ? [s.angleId] : undefined, template: s.template, privacy: s.privacy };
+}

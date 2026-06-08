@@ -6,6 +6,7 @@ asset**, and the implementation plan to take the Create-Post wizard from *mock* 
 > **Status legend**
 > - 🟢 **Implemented** — exists in code today.
 > - 🟡 **To build** — the agreed target; this document is the spec.
+> - 🔴 **Not implemented** — part of the spec but deliberately deferred; not built yet.
 >
 > Today the wizard navigates, lets the doctor pick format/template/privacy, and **enforces social
 > consent** — but every preview draws the placeholder subject (no real photo), and **Save / Share
@@ -14,7 +15,7 @@ asset**, and the implementation plan to take the Create-Post wizard from *mock* 
 
 ---
 
-## 1. The flow 🟢 (navigation) / 🟡 (content)
+## 1. The flow 🟢 (navigation) / 🟢 (content)
 
 A 4-step wizard + export screen. Entered from Timeline, a session card, or the Compare screen's
 "Create social post" CTA — all call `nav.go('postSelect', { cid, caseId })`.
@@ -25,7 +26,7 @@ A 4-step wizard + export screen. Entered from Timeline, a session card, or the C
 | S16 | Format | [`PostFormatScreen.js`](../src/screens/PostFormatScreen.js) | 🟢 sets `1:1 / 4:5 / 9:16` |
 | S17 | Template | [`PostTemplateScreen.js`](../src/screens/PostTemplateScreen.js) | 🟢 sets `split / slider / timeline / single` |
 | S18 | Privacy | [`PostPrivacyScreen.js`](../src/screens/PostPrivacyScreen.js) | 🟢 toggles + **consent gate** |
-| S19 | Export / Share | [`PostExportScreen.js`](../src/screens/PostExportScreen.js) | 🟡 Save / Share are toasts |
+| S19 | Export / Share | [`PostExportScreen.js`](../src/screens/PostExportScreen.js) | 🟢 Save / Share are toasts |
 | — | Shared renderer | [`PostPreview.js`](../src/components/PostPreview.js) | 🟡 placeholder subject everywhere |
 | — | Wizard shell | [`Wizard.js`](../src/components/Wizard.js) | 🟢 |
 
@@ -104,7 +105,7 @@ takes the stored geometry directly: `{ uri, eyeBoxes, imgW, imgH }` from `sessio
 > show the placeholder subject — acceptable; the wiring is identical for real device captures.
 > A meaningful post needs ≥1 before and ≥1 after session captured for the angle.
 
-🟡 **Optional parity with Compare:** let `PostSelect` reuse Compare's "pick which 2 images" strip so
+🔴 **Optional parity with Compare:** let `PostSelect` reuse Compare's "pick which 2 images" strip so
 the doctor can override the default before/after when an angle has >2 sessions, storing the chosen
 session ids in `cfg` (e.g. `cfg.pairs = { [angleId]: [beforeSid, afterSid] }`). Otherwise default to
 `beforeAfter()`.

@@ -21,12 +21,12 @@ export default function PostFormatScreen({ route }) {
   const nav = useNav();
   const c = store.clients.find((x) => x.id === params.cid);
   const cs = c.cases.find((x) => x.id === params.caseId);
-  const [fmt, setFmt] = React.useState('4:5');
+  const [fmt, setFmt] = React.useState(params.cfg?.format ?? '4:5');
   const cfg = { ...params.cfg, format: fmt };
 
   return (
-    <Wizard step={1} title="Format"
-      footer={<ActionBar><Btn variant="primary" lg block label="Next · template" onPress={() => nav.go('postTemplate', { ...params, cfg })} /></ActionBar>}>
+    <Wizard title="Select Size"
+      footer={<ActionBar><Btn variant="primary" lg block label="Use this size" onPress={() => { params.onPick?.(fmt); nav.back(); }} /></ActionBar>}>
       <View style={{ alignItems: 'center', paddingTop: 6, paddingBottom: 18 }}>
         <PostPreview cfg={{ ...cfg, template: 'split', privacy: { logo: true } }} t={t} c={c} cs={cs} size={fmt === '9:16' ? 150 : 210} />
       </View>

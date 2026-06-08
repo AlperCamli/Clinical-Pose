@@ -20,6 +20,8 @@ import PostFormatScreen from './screens/PostFormatScreen';
 import PostTemplateScreen from './screens/PostTemplateScreen';
 import PostPrivacyScreen from './screens/PostPrivacyScreen';
 import PostExportScreen from './screens/PostExportScreen';
+import PostHistoryScreen from './screens/PostHistoryScreen';
+import PostDetailScreen from './screens/PostDetailScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import SyncScreen from './screens/SyncScreen';
 
@@ -52,6 +54,8 @@ export default function RootNavigator() {
       <Stack.Screen name="postTemplate" component={PostTemplateScreen} />
       <Stack.Screen name="postPrivacy" component={PostPrivacyScreen} />
       <Stack.Screen name="postExport" component={PostExportScreen} />
+      <Stack.Screen name="postHistory" component={PostHistoryScreen} />
+      <Stack.Screen name="postDetail" component={PostDetailScreen} />
       <Stack.Screen name="settings" component={SettingsScreen} />
       <Stack.Screen name="sync" component={SyncScreen} />
     </Stack.Navigator>

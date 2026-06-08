@@ -51,15 +51,24 @@ CREATE TABLE IF NOT EXISTS consent_events (
   clientId TEXT NOT NULL,
   kind TEXT, granted INTEGER, at INTEGER
 );
+CREATE TABLE IF NOT EXISTS posts (
+  id TEXT PRIMARY KEY NOT NULL,
+  serverId TEXT,
+  caseId TEXT NOT NULL,
+  mode TEXT, format TEXT, slides TEXT, status TEXT,
+  createdAt INTEGER, sharedAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
+);
 CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(clientId);
 CREATE INDEX IF NOT EXISTS idx_sessions_case ON sessions(caseId);
 CREATE INDEX IF NOT EXISTS idx_photos_session ON photos(sessionId);
+CREATE INDEX IF NOT EXISTS idx_posts_case ON posts(caseId);
 `;
 
 // Schema version. v1 recovered the corrupted seed (non-unique ids). v2 adds eye
-// redaction columns. v3 adds stable photo keys + gallery recovery metadata.
-// Additive migrations preserve photos already captured on-device.
-const DB_VERSION = 3;
+// redaction columns. v3 adds stable photo keys + gallery recovery metadata. v4
+// adds the social-post history table (created via CREATE TABLE IF NOT EXISTS, so
+// no ALTER migration is needed). Additive migrations preserve on-device data.
+const DB_VERSION = 4;
 const V2_PHOTO_COLS = ['eyeBoxes TEXT', 'eyeDetected INTEGER', 'imgW INTEGER', 'imgH INTEGER'];
 const V3_PHOTO_COLS = ['photoKey TEXT', 'galleryAssetId TEXT', 'galleryUri TEXT', 'fileMissing INTEGER DEFAULT 0'];
 
@@ -188,6 +197,22 @@ export async function addConsentEvent(clientId, kind, granted) {
     [uid(), clientId, kind, granted ? 1 : 0, Date.now()]);
 }
 
+// Insert or update a social-post history record. `slides` is JSON-serialized.
+export async function upsertPost(caseId, post) {
+  const db = await getDB();
+  const ts = Date.now();
+  await db.runAsync(
+    `INSERT INTO posts (id, serverId, caseId, mode, format, slides, status, createdAt, sharedAt, updatedAt, dirty)
+     VALUES (?,?,?,?,?,?,?,?,?,?,1)
+     ON CONFLICT(id) DO UPDATE SET
+       mode=excluded.mode, format=excluded.format, slides=excluded.slides, status=excluded.status,
+       sharedAt=excluded.sharedAt, updatedAt=excluded.updatedAt, dirty=1`,
+    [post.id, post.serverId ?? null, caseId, post.mode ?? null, post.format ?? null,
+      JSON.stringify(post.slides ?? []), post.status ?? 'ready',
+      post.createdAt ?? ts, post.sharedAt ?? null, ts]
+  );
+}
+
 // Insert a whole case subtree (case → sessions → photos), used by addCase.
 export async function upsertCaseGraph(clientId, cs) {
   await upsertCase(clientId, cs);
@@ -223,11 +248,12 @@ export async function seedIfEmpty(seedClients) {
 // ---------------- hydrate ----------------
 export async function loadAll() {
   const db = await getDB();
-  const [clientRows, caseRows, sessionRows, photoRows] = await Promise.all([
+  const [clientRows, caseRows, sessionRows, photoRows, postRows] = await Promise.all([
     db.getAllAsync('SELECT * FROM clients ORDER BY createdAt DESC, rowid DESC'),
     db.getAllAsync('SELECT * FROM cases ORDER BY createdAt DESC, rowid DESC'),
     db.getAllAsync('SELECT * FROM sessions ORDER BY createdAt ASC, rowid ASC'),
     db.getAllAsync('SELECT * FROM photos'),
+    db.getAllAsync('SELECT * FROM posts ORDER BY createdAt DESC, rowid DESC'),
   ]);
 
   const casesById = {};
@@ -293,12 +319,23 @@ export async function loadAll() {
       refSource: s.refSource || undefined, photos: photosBySession[s.id] || {},
     });
   }
+  const postsByCase = {};
+  for (const p of postRows) {
+    let slides;
+    try { slides = p.slides ? JSON.parse(p.slides) : []; } catch { slides = []; }
+    if (!postsByCase[p.caseId]) postsByCase[p.caseId] = [];
+    postsByCase[p.caseId].push({
+      id: p.id, caseId: p.caseId, mode: p.mode, format: p.format, slides, status: p.status || 'ready',
+      createdAt: p.createdAt, sharedAt: p.sharedAt || undefined,
+    });
+  }
   const casesByClient = {};
   for (const cs of caseRows) {
     if (!casesByClient[cs.clientId]) casesByClient[cs.clientId] = [];
     casesByClient[cs.clientId].push({
       id: cs.id, treatment: cs.treatment, started: cs.started,
       practitioner: cs.practitioner, sessions: sessionsByCase[cs.id] || [],
+      posts: postsByCase[cs.id] || [],
     });
   }
   return clientRows.map((c) => ({
