@@ -6,7 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { defaultEyeBox } from '../data/eyeDefaults';
-import Svg, { Ellipse, Rect } from 'react-native-svg';
+import { resolveOverlay } from '../data/overlays';
+import GuideOverlay from '../components/GuideOverlay';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import Photo from '../components/Photo';
@@ -17,16 +18,6 @@ import { C } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { photoCaptured } from '../data/helpers';
-
-// dashed alignment guide (generic / fallback ghost)
-function GhostGuide() {
-  return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-      <Ellipse cx="50%" cy="52%" rx="23%" ry="33%" fill="none" stroke="rgba(120,180,255,0.85)" strokeWidth={2} strokeDasharray="7 7" />
-      <Rect x="29%" y="40%" width="42%" height="9%" rx={5} fill="none" stroke="rgba(120,180,255,0.7)" strokeWidth={2} strokeDasharray="6 6" />
-    </Svg>
-  );
-}
 
 export default function CameraScreen({ route }) {
   const params = route.params || {};
@@ -51,6 +42,7 @@ export default function CameraScreen({ route }) {
 
   const a = angles[idx];
   const overlayMode = isAfter && !useGeneric;
+  const guide = React.useMemo(() => resolveOverlay(a), [a]);
 
   // reference (ghost) photo for after-overlay
   const refSession = React.useMemo(() => {
@@ -144,7 +136,7 @@ export default function CameraScreen({ route }) {
           {overlayMode && ghostUri && (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(120,170,255,0.10)', opacity }]} />
           )}
-          {(!isAfter || useGeneric || (overlayMode && !ghostUri)) && <GhostGuide />}
+          {(!isAfter || useGeneric || (overlayMode && !ghostUri)) && <GuideOverlay overlay={guide} mirror={facing === 'front'} />}
 
           {/* rule of thirds */}
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -158,7 +150,7 @@ export default function CameraScreen({ route }) {
           <View style={{ position: 'absolute', top: 12, left: 0, right: 0, alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(12,15,20,0.7)', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8 }}>
               <Icon name={overlayMode ? 'layers' : 'align'} size={11} color="#fff" />
-              <Txt mono style={{ fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3, color: '#fff' }}>{overlayMode ? 'BEFORE OVERLAY' : 'GENERIC GUIDE'}</Txt>
+              <Txt mono style={{ fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3, color: '#fff' }}>{overlayMode ? 'BEFORE OVERLAY' : ((guide?.src || guide?.shapes?.length) ? `${guide.label.toUpperCase()} GUIDE` : 'GENERIC GUIDE')}</Txt>
             </View>
           </View>
 
