@@ -8,7 +8,8 @@ import PostPreview from '../components/PostPreview';
 import { ActionBar, Card, Btn, Switch, Segmented, Field, SecLabel, Chip } from '../components/ui';
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
-import { reqAngles, slideCfg, DEFAULT_POST_PRIVACY } from '../data/helpers';
+import { reqAngles, slideCfg, beforeAfter, DEFAULT_POST_PRIVACY } from '../data/helpers';
+import { BG_REMOVAL_AVAILABLE } from '../data/backgroundRemoval';
 
 export default function PostPrivacyScreen({ route }) {
   const params = route.params || {};
@@ -19,8 +20,13 @@ export default function PostPrivacyScreen({ route }) {
 
   const angleIds = params.cfg?.sel?.length ? params.cfg.sel : [undefined];
   const multi = angleIds.length > 1;
+  // Seed each angle's "remove background" default from the result (after) photo's
+  // saved per-photo preference, so a choice made in Session Review carries into sharing.
   const [privacy, setPrivacy] = React.useState(() =>
-    Object.fromEntries(angleIds.map((a) => [a, { ...DEFAULT_POST_PRIVACY }]))
+    Object.fromEntries(angleIds.map((a) => {
+      const after = a ? beforeAfter(cs, a).after : null;
+      return [a, { ...DEFAULT_POST_PRIVACY, bgRemove: !!after?.photos?.[a]?.bgRemove }];
+    }))
   );
   const [active, setActive] = React.useState(0);
   const activeAngle = angleIds[Math.min(active, angleIds.length - 1)];
@@ -80,6 +86,10 @@ export default function PostPrivacyScreen({ route }) {
       <Field label="Eyes">
         <Segmented options={[{ v: 'hidden', l: 'Hidden (safe)' }, { v: 'visible', l: 'Visible' }]} value={pa.eyes} onChange={(v) => set('eyes', v)} />
       </Field>
+      <SecLabel>Background</SecLabel>
+      <Card>
+        <Row k="bgRemove" label="Remove background" sub={BG_REMOVAL_AVAILABLE ? 'Cut out the subject on solid black' : 'Needs a dev build (not Expo Go)'} />
+      </Card>
       <SecLabel>Show on asset</SecLabel>
       <Card>
         <Row k="name" label="Client name" sub="Off by default" />

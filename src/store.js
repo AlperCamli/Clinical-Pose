@@ -116,6 +116,7 @@ export function AppProvider({ children }) {
           uri: saved.uri, photoKey: saved.photoKey, galleryAssetId: saved.galleryAssetId,
           galleryUri: saved.galleryUri, fileMissing: false,
           eyeBoxes: data.eyeBoxes ?? [], eyeDetected: !!data.eyeDetected, imgW: data.imgW, imgH: data.imgH,
+          bgRemove: false,
         };
         s.photos[aid] = rec;
         bump();
@@ -136,6 +137,15 @@ export function AppProvider({ children }) {
         if (!rec) return;
         rec.eyeBoxes = boxes || [];
         rec.eyeDetected = !!(boxes && boxes.length);
+        bump();
+        save(upsertPhoto(sid, aid, rec));
+      },
+      // flip a saved photo's "remove background (black)" preference; the on-disk
+      // original is never modified — the cut-out is generated on demand for display
+      setPhotoBgRemove: (cid, caseId, sid, aid, on) => {
+        const rec = findSession(cid, caseId, sid)?.photos[aid];
+        if (!rec) return;
+        rec.bgRemove = !!on;
         bump();
         save(upsertPhoto(sid, aid, rec));
       },

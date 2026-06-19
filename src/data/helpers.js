@@ -42,7 +42,7 @@ export function clone(x) {
 // ---------------- social posts ----------------
 // Privacy-safe defaults for a single post photo (mirrors PostPrivacyScreen).
 export const DEFAULT_POST_PRIVACY = {
-  eyes: 'hidden', name: false, treatment: true, date: true, logo: true, doctor: false, disclaimer: true,
+  eyes: 'hidden', bgRemove: false, name: false, treatment: true, date: true, logo: true, doctor: false, disclaimer: true,
 };
 
 // Resolve a wizard cfg (with per-angle template/privacy maps) into a FLAT cfg for

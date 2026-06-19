@@ -10,6 +10,7 @@ import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { reqAngles, fmtDate, capturedSessions } from '../data/helpers';
+import { BG_REMOVAL_AVAILABLE } from '../data/backgroundRemoval';
 
 function AngleLabel({ text, ok, right }) {
   return (
@@ -40,6 +41,7 @@ export default function CompareScreen({ route }) {
   const [mode, setMode] = React.useState('slider');
   const [angleId, setAngleId] = React.useState(angles[0]?.id);
   const [eye, setEye] = React.useState(true);
+  const [bg, setBg] = React.useState(false); // remove background → black backdrop
   const [reveal, setReveal] = React.useState(50);
   const [w, setW] = React.useState(0);
   const wRef = React.useRef(0);
@@ -115,7 +117,14 @@ export default function CompareScreen({ route }) {
   return (
     <Screen>
       <TopBar onBack={nav.back} title="Compare" sub={`${TREATMENTS[cs.treatment].name} · ${c.name}`} border
-        right={<IconBtn name={eye ? 'eyeoff' : 'eye'} size={18} color={eye ? C.accentInk : C.ink2} onPress={() => setEye((v) => !v)} accessibilityLabel="Eyes" />} />
+        right={(
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {BG_REMOVAL_AVAILABLE && (
+              <IconBtn name="layers" size={18} color={bg ? C.accentInk : C.ink2} onPress={() => setBg((v) => !v)} accessibilityLabel="Remove background" />
+            )}
+            <IconBtn name={eye ? 'eyeoff' : 'eye'} size={18} color={eye ? C.accentInk : C.ink2} onPress={() => setEye((v) => !v)} accessibilityLabel="Eyes" />
+          </View>
+        )} />
       <View style={{ paddingHorizontal: PAD, paddingTop: 12, paddingBottom: 6 }}>
         <Segmented options={[{ v: 'side', l: 'Side by side' }, { v: 'slider', l: 'Slider' }, { v: 'timeline', l: 'Timeline' }]} value={mode} onChange={setMode} />
       </View>
@@ -131,7 +140,7 @@ export default function CompareScreen({ route }) {
                 {[{ s: A, text: 'BEFORE', ok: false }, { s: B, text: 'AFTER', ok: true }].map(({ s, text, ok }) => (
                   <View key={text} style={{ flex: 1 }}>
                     <Card style={{ overflow: 'hidden', height: 300 }}>
-                      <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} {...ph(s)} variant="plain" style={{ height: '100%', borderRadius: 0, borderWidth: 0 }} />
+                      <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} bgRemove={bg} {...ph(s)} variant="plain" style={{ height: '100%', borderRadius: 0, borderWidth: 0 }} />
                       <AngleLabel text={text} ok={ok} />
                     </Card>
                     <View style={{ alignItems: 'center', marginTop: 6 }}>
@@ -155,10 +164,10 @@ export default function CompareScreen({ route }) {
                   onLayout={(e) => { wRef.current = e.nativeEvent.layout.width; setW(e.nativeEvent.layout.width); measureBox(); }}
                 >
                   <Card style={{ overflow: 'hidden', height: 330 }}>
-                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} {...ph(A)} variant="plain" style={{ height: '100%', borderRadius: 0, borderWidth: 0 }} />
+                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} bgRemove={bg} {...ph(A)} variant="plain" style={{ height: '100%', borderRadius: 0, borderWidth: 0 }} />
                     {/* after, revealed from handle to right */}
                     <View style={{ position: 'absolute', top: 0, bottom: 0, left: revealX, width: Math.max(0, w - revealX), overflow: 'hidden' }}>
-                      <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} {...ph(B)} variant="plain" style={{ position: 'absolute', left: -revealX, top: 0, width: w, height: '100%', borderRadius: 0, borderWidth: 0 }} />
+                      <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} bgRemove={bg} {...ph(B)} variant="plain" style={{ position: 'absolute', left: -revealX, top: 0, width: w, height: '100%', borderRadius: 0, borderWidth: 0 }} />
                       <View style={{ position: 'absolute', top: 0, left: -revealX, width: w, height: '100%', backgroundColor: 'rgba(255,255,255,0.05)' }} />
                     </View>
                     <AngleLabel text="BEFORE" />
@@ -185,7 +194,7 @@ export default function CompareScreen({ route }) {
               <ScrollBody horizontal contentStyle={{ gap: 8, paddingBottom: 6 }} style={{ flexGrow: 0 }}>
                 {tlShown.map((s) => (
                   <View key={s.id} style={{ width: 130 }}>
-                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} {...ph(s)} variant="plain" style={{ height: 170 }} />
+                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} bgRemove={bg} {...ph(s)} variant="plain" style={{ height: 170 }} />
                     <View style={{ alignItems: 'center', marginTop: 6 }}>
                       <Txt style={{ fontWeight: '600', fontSize: 12.5 }} numberOfLines={1}>{s.label}</Txt>
                       <Txt mono style={{ fontSize: 10.5, color: C.ink3 }}>{fmtDate(s.date)}</Txt>
@@ -214,7 +223,7 @@ export default function CompareScreen({ route }) {
               return (
                 <Pressable key={s.id} onPress={() => (mode === 'timeline' ? toggleTl(s.id) : togglePair(s.id))} style={{ width: 84 }}>
                   <View style={{ borderRadius: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? C.accent : C.line2, backgroundColor: C.surface, padding: 2 }}>
-                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} {...ph(s)} variant="plain" style={{ height: 100, borderRadius: 9 }}>
+                    <Photo eyeHidden={eye} eyeStyle={t.eyeStyle} bgRemove={bg} {...ph(s)} variant="plain" style={{ height: 100, borderRadius: 9 }}>
                       {selected && mode === 'timeline' && (
                         <View style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 99, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
                           <Icon name="check" size={13} color="#fff" />

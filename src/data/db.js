@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS photos (
   localUri TEXT, remoteUrl TEXT,
   photoKey TEXT, galleryAssetId TEXT, galleryUri TEXT, fileMissing INTEGER DEFAULT 0,
   eyeBoxes TEXT, eyeDetected INTEGER, imgW INTEGER, imgH INTEGER,
+  bgRemove INTEGER DEFAULT 0,
   createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS consent_events (
@@ -67,10 +68,12 @@ CREATE INDEX IF NOT EXISTS idx_posts_case ON posts(caseId);
 // Schema version. v1 recovered the corrupted seed (non-unique ids). v2 adds eye
 // redaction columns. v3 adds stable photo keys + gallery recovery metadata. v4
 // adds the social-post history table (created via CREATE TABLE IF NOT EXISTS, so
-// no ALTER migration is needed). Additive migrations preserve on-device data.
-const DB_VERSION = 4;
+// no ALTER migration is needed). v5 adds the per-photo background-removal flag.
+// Additive migrations preserve on-device data.
+const DB_VERSION = 5;
 const V2_PHOTO_COLS = ['eyeBoxes TEXT', 'eyeDetected INTEGER', 'imgW INTEGER', 'imgH INTEGER'];
 const V3_PHOTO_COLS = ['photoKey TEXT', 'galleryAssetId TEXT', 'galleryUri TEXT', 'fileMissing INTEGER DEFAULT 0'];
+const V5_PHOTO_COLS = ['bgRemove INTEGER DEFAULT 0'];
 
 export async function initDB() {
   const db = await getDB();
@@ -97,6 +100,11 @@ export async function initDB() {
   }
   if (current >= 1 && current < 3) {
     for (const col of V3_PHOTO_COLS) {
+      try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
+    }
+  }
+  if (current >= 1 && current < 5) {
+    for (const col of V5_PHOTO_COLS) {
       try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
     }
   }
@@ -156,19 +164,20 @@ export async function upsertPhoto(sessionId, angleId, rec, createdAt) {
   await db.runAsync(
     `INSERT INTO photos (id, serverId, sessionId, angleId, status, eyeHidden, tag, localUri, remoteUrl,
        photoKey, galleryAssetId, galleryUri, fileMissing,
-       eyeBoxes, eyeDetected, imgW, imgH, createdAt, updatedAt, dirty)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+       eyeBoxes, eyeDetected, imgW, imgH, bgRemove, createdAt, updatedAt, dirty)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
      ON CONFLICT(id) DO UPDATE SET
        status=excluded.status, eyeHidden=excluded.eyeHidden, tag=excluded.tag,
        localUri=excluded.localUri, remoteUrl=excluded.remoteUrl,
        photoKey=excluded.photoKey, galleryAssetId=excluded.galleryAssetId,
        galleryUri=excluded.galleryUri, fileMissing=excluded.fileMissing,
        eyeBoxes=excluded.eyeBoxes, eyeDetected=excluded.eyeDetected,
-       imgW=excluded.imgW, imgH=excluded.imgH, updatedAt=excluded.updatedAt, dirty=1`,
+       imgW=excluded.imgW, imgH=excluded.imgH, bgRemove=excluded.bgRemove,
+       updatedAt=excluded.updatedAt, dirty=1`,
     [photoId(sessionId, angleId), rec.serverId ?? null, sessionId, angleId, rec.status ?? 'captured',
       rec.eyeHidden ? 1 : 0, rec.tag ?? null, rec.uri ?? null, rec.remoteUrl ?? null,
       rec.photoKey ?? null, rec.galleryAssetId ?? null, rec.galleryUri ?? null, rec.fileMissing ? 1 : 0,
-      boxes, rec.eyeDetected ? 1 : 0, rec.imgW ?? null, rec.imgH ?? null, createdAt ?? ts, ts]
+      boxes, rec.eyeDetected ? 1 : 0, rec.imgW ?? null, rec.imgH ?? null, rec.bgRemove ? 1 : 0, createdAt ?? ts, ts]
   );
 }
 
@@ -309,6 +318,7 @@ export async function loadAll() {
       galleryUri: storage.galleryUri || undefined,
       fileMissing: !!storage.fileMissing,
       eyeBoxes, eyeDetected: !!p.eyeDetected, imgW: p.imgW || undefined, imgH: p.imgH || undefined,
+      bgRemove: !!p.bgRemove,
     };
   }
   const sessionsByCase = {};

@@ -3,13 +3,14 @@
 // captured image. For real images it draws a NON-DESTRUCTIVE eye redaction from
 // the stored normalized eye boxes (the original file is never modified).
 import React from 'react';
-import { View, StyleSheet, Image, Platform } from 'react-native';
+import { View, StyleSheet, Image, Platform, ActivityIndicator } from 'react-native';
 import Svg, { Defs, Pattern, Rect, Ellipse, LinearGradient, Stop, ClipPath } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import Txt from './Txt';
 import { C, R_SM } from '../theme';
 import { coverRects } from '../data/eyeGeometry';
 import { getStyle } from '../data/redactionStyles';
+import { useBgRemoved } from '../data/backgroundRemoval';
 
 function Subject({ w, h, eyeHidden, eyeStyle, uid }) {
   if (!w || !h) return null;
@@ -99,6 +100,7 @@ function RedactionMark({ rect, style, uid }) {
 export default function Photo({
   uri, angleCode, badge, eyeHidden = true, eyeStyle = 'blur', variant = 'plain',
   eyeBoxes, imgW, imgH, fileMissing = false, dim = false, style, corners = false, overlayLabel, children,
+  bgRemove = false, bg = '#000',
 }) {
   const flat = StyleSheet.flatten(style) || {};
   const radius = flat.borderRadius !== undefined ? flat.borderRadius : R_SM;
@@ -114,6 +116,16 @@ export default function Photo({
     ? { backgroundColor: C.surface2, borderWidth: 1.5, borderColor: C.line2, borderStyle: 'dashed' }
     : { backgroundColor: '#e7ecf2', borderWidth: 1, borderColor: C.line2 };
 
+  // Background removal: when enabled for a real image, resolve a cut-out (on-device,
+  // cached) and lay it over a solid backdrop. While the cut-out resolves — or when
+  // the native module is unavailable (Expo Go / simulator) — we keep showing the
+  // ORIGINAL opaque image, which fully covers the backdrop, so the result simply
+  // falls back to the untouched photo instead of breaking.
+  const realImg = !empty && !unavailable && !!uri;
+  const { uri: cutout, loading: bgLoading } = useBgRemoved(uri, bgRemove && realImg);
+  const showCutout = bgRemove && realImg && !!cutout;
+  const backdrop = bgRemove && realImg ? bg : null;
+
   const redact = !empty && !unavailable && !!uri && eyeHidden && eyeBoxes?.length > 0;
   const rects = redact ? coverRects(eyeBoxes, size.w, size.h, imgW, imgH) : [];
 
@@ -123,9 +135,14 @@ export default function Photo({
         const { width, height } = e.nativeEvent.layout;
         setSize((s) => (Math.abs(s.w - width) > 0.5 || Math.abs(s.h - height) > 0.5 ? { w: width, h: height } : s));
       }}
-      style={[{ overflow: 'hidden', borderRadius: radius }, base, flat]}
+      style={[{ overflow: 'hidden', borderRadius: radius }, base, flat, backdrop && { backgroundColor: backdrop }]}
     >
-      {!empty && !unavailable && uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+      {realImg && <Image source={{ uri: showCutout ? cutout : uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+      {backdrop && bgLoading && (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="none">
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+        </View>
+      )}
       {!empty && !unavailable && !uri && <Subject w={size.w} h={size.h} eyeHidden={eyeHidden} eyeStyle={eyeStyle} uid={uid} />}
       {unavailable && (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, backgroundColor: C.surface2 }]}>

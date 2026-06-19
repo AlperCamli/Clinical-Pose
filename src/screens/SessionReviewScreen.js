@@ -12,6 +12,7 @@ import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { defaultEyeBox } from '../data/eyeDefaults';
 import { fmtDate, photoCaptured } from '../data/helpers';
+import { BG_REMOVAL_AVAILABLE } from '../data/backgroundRemoval';
 
 export default function SessionReviewScreen({ route }) {
   const params = route.params || {};
@@ -62,7 +63,7 @@ export default function SessionReviewScreen({ route }) {
               <Card key={a.id} style={{ width: '47.8%', flexGrow: 1, overflow: 'hidden', padding: 0 }}>
                 <Pressable onPress={() => nav.go('camera', { ...params, startIdx: angles.indexOf(a) })}>
                   <Photo
-                    angleCode={a.code} eyeHidden={hidden} eyeStyle={t.eyeStyle}
+                    angleCode={a.code} eyeHidden={hidden} eyeStyle={t.eyeStyle} bgRemove={photo?.bgRemove}
                     uri={photo?.uri} eyeBoxes={photo?.eyeBoxes} imgW={photo?.imgW} imgH={photo?.imgH}
                     fileMissing={photo?.fileMissing}
                     variant={(cap || photo?.fileMissing) ? 'plain' : 'empty'} style={{ height: 128, borderRadius: 0, borderWidth: 0 }}
@@ -86,6 +87,11 @@ export default function SessionReviewScreen({ route }) {
                           <Pressable onPress={() => store.setPhotoEyeHidden(c.id, cs.id, s.id, a.id, !hidden)} hitSlop={10}>
                             <Icon name={hidden ? 'eyeoff' : 'eye'} size={17} color={hidden ? C.accentInk : C.ink3} />
                           </Pressable>
+                          {BG_REMOVAL_AVAILABLE && (
+                            <Pressable onPress={() => store.setPhotoBgRemove(c.id, cs.id, s.id, a.id, !photo?.bgRemove)} hitSlop={10}>
+                              <Icon name="layers" size={16} color={photo?.bgRemove ? C.accentInk : C.ink3} />
+                            </Pressable>
+                          )}
                         </>
                       )}
                       {photo?.fileMissing && <Tag variant="warn" style={{ paddingVertical: 2, paddingHorizontal: 6 }}>FILE</Tag>}

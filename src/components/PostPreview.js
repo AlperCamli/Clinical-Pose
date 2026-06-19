@@ -24,6 +24,7 @@ export default function PostPreview({ cfg, t, c, cs, size, bare }) {
   const H = W / ratio;
   const eye = cfg.privacy?.eyes !== 'visible';
   const eyeStyle = t?.eyeStyle;
+  const noBg = !!cfg.privacy?.bgRemove; // remove background → solid black backdrop
   const tmpl = cfg.template || 'split';
   const photoStyle = { borderRadius: 0, borderWidth: 0, height: '100%' };
 
@@ -46,21 +47,21 @@ export default function PostPreview({ cfg, t, c, cs, size, bare }) {
       {tmpl === 'split' && (
         <View style={{ flexDirection: 'row', height: '100%', gap: 2 }}>
           <View style={{ flex: 1 }}>
-            <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(before)} variant="plain" style={photoStyle} />
+            <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(before)} variant="plain" style={photoStyle} />
             {!bare && <Label text="BEFORE" />}
           </View>
           <View style={{ flex: 1 }}>
-            <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={photoStyle} />
+            <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(after)} variant="plain" style={photoStyle} />
             {!bare && <Label text="AFTER" ok />}
           </View>
         </View>
       )}
       {tmpl === 'slider' && (
         <View style={{ height: '100%' }}>
-          <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(before)} variant="plain" style={photoStyle} />
+          <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(before)} variant="plain" style={photoStyle} />
           {/* after, revealed in the right half and right-anchored so it aligns with the frame */}
           <View style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', right: 0, overflow: 'hidden' }}>
-            <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={{ ...photoStyle, position: 'absolute', right: 0, width: W }} />
+            <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(after)} variant="plain" style={{ ...photoStyle, position: 'absolute', right: 0, width: W }} />
           </View>
           <View style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, backgroundColor: '#fff' }} />
           {!bare && <Label text="BEFORE" />}
@@ -71,12 +72,12 @@ export default function PostPreview({ cfg, t, c, cs, size, bare }) {
         <View style={{ flexDirection: 'row', height: '100%', gap: 2 }}>
           {tlCells.map((s, i) => (
             <View key={s?.id || i} style={{ flex: 1 }}>
-              <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(s)} variant="plain" style={photoStyle} />
+              <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(s)} variant="plain" style={photoStyle} />
             </View>
           ))}
         </View>
       )}
-      {tmpl === 'single' && <Photo eyeHidden={eye} eyeStyle={eyeStyle} {...ph(after)} variant="plain" style={photoStyle} />}
+      {tmpl === 'single' && <Photo eyeHidden={eye} eyeStyle={eyeStyle} bgRemove={noBg} {...ph(after)} variant="plain" style={photoStyle} />}
 
       {!bare && cfg.privacy?.disclaimer && (
         <View style={{ position: 'absolute', top: 8, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.35)', paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 }}>

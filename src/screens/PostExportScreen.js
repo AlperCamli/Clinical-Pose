@@ -10,7 +10,8 @@ import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { captureAsset } from '../data/postCapture';
 import { savePostToGallery, sharePost } from '../data/posts';
-import { buildQueue, postToSlideCfg, DEFAULT_POST_PRIVACY, uid } from '../data/helpers';
+import { removeBg } from '../data/backgroundRemoval';
+import { buildQueue, postToSlideCfg, beforeAfter, capturedSessions, DEFAULT_POST_PRIVACY, uid } from '../data/helpers';
 
 // Off-screen render size (points). Captured & scaled up to POST_PX so the asset is
 // crisp while the on-screen preview stays small.
@@ -69,7 +70,24 @@ export default function PostExportScreen({ route }) {
     else toast('Something went wrong');
   }
 
+  // The source photo uris a slide will render (before/after + any timeline cells),
+  // so we can compute their cut-outs up front for background removal.
+  function slidePhotoUris(slide) {
+    const aid = slide.angleId;
+    if (!aid) return [];
+    const { before, after } = beforeAfter(cs, aid);
+    const sessions = [before, after, ...capturedSessions(cs, aid)].filter(Boolean);
+    return sessions.map((sx) => sx?.photos?.[aid]?.uri).filter(Boolean);
+  }
+
   async function renderPost(post) {
+    // Warm the on-device background-removal cache for any slide that needs it, so
+    // the off-screen <Photo> cut-outs are ready before the (deterministic) snapshot.
+    const needBg = post.slides.filter((s) => s.privacy?.bgRemove);
+    if (needBg.length) {
+      const srcUris = [...new Set(needBg.flatMap(slidePhotoUris))];
+      await Promise.all(srcUris.map((u) => removeBg(u)));
+    }
     await wait(350); // let images/layout settle before the snapshot
     const uris = [];
     for (let i = 0; i < post.slides.length; i++) {

@@ -18,6 +18,7 @@ import { C } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { photoCaptured } from '../data/helpers';
+import { useBgRemoved, BG_REMOVAL_AVAILABLE } from '../data/backgroundRemoval';
 
 export default function CameraScreen({ route }) {
   const params = route.params || {};
@@ -35,6 +36,7 @@ export default function CameraScreen({ route }) {
   const [idx, setIdx] = React.useState(params.startIdx || 0);
   const [opacity, setOpacity] = React.useState(0.5);
   const [useGeneric, setUseGeneric] = React.useState(false);
+  const [ghostCutout, setGhostCutout] = React.useState(true); // background-removed ghost
   const [eyeHidden, setEyeHidden] = React.useState(c.eyeDefault !== 'visible');
   const [shot, setShot] = React.useState(null); // {aid, uri}
   const [facing, setFacing] = React.useState('back');
@@ -54,6 +56,14 @@ export default function CameraScreen({ route }) {
   }, [cs, s]);
   const refPhoto = overlayMode ? refSession?.photos[a.id] : null;
   const ghostUri = photoCaptured(refPhoto) ? refPhoto?.uri : null;
+
+  // Background-removed ghost: overlay only the subject so background clutter in the
+  // reference photo doesn't fight the live view during alignment. The cut-out is
+  // transparent, so the camera shows through everywhere except the subject. Falls
+  // back to the full reference photo while the cut-out resolves / when unavailable.
+  const { uri: ghostCut } = useBgRemoved(ghostUri, overlayMode && !!ghostUri && ghostCutout);
+  const usingCutout = ghostCutout && !!ghostCut;
+  const ghostSrc = usingCutout ? ghostCut : ghostUri;
 
   React.useEffect(() => { requestPermission?.(); }, []); // eslint-disable-line
 
@@ -131,9 +141,10 @@ export default function CameraScreen({ route }) {
         <View style={{ flex: 1, position: 'relative' }}>
           {/* ghost / guide */}
           {overlayMode && ghostUri && (
-            <Image source={{ uri: ghostUri }} style={[StyleSheet.absoluteFill, { opacity }]} resizeMode="cover" />
+            <Image source={{ uri: ghostSrc }} style={[StyleSheet.absoluteFill, { opacity }]} resizeMode="cover" />
           )}
-          {overlayMode && ghostUri && (
+          {/* blue tint only for the full-photo ghost — a subject cut-out shouldn't tint the whole live view */}
+          {overlayMode && ghostUri && !usingCutout && (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(120,170,255,0.10)', opacity }]} />
           )}
           {(!isAfter || useGeneric || (overlayMode && !ghostUri)) && <GuideOverlay overlay={guide} mirror={facing === 'front'} />}
@@ -158,7 +169,7 @@ export default function CameraScreen({ route }) {
           {overlayMode && (
             <View style={{ position: 'absolute', bottom: 12, left: 12 }}>
               <View style={{ width: 56, borderRadius: 10, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)' }}>
-                <Photo eyeStyle={t.eyeStyle} uri={ghostUri} eyeBoxes={refPhoto?.eyeBoxes} imgW={refPhoto?.imgW} imgH={refPhoto?.imgH} variant="plain" style={{ height: 70, borderRadius: 0, borderWidth: 0 }} />
+                <Photo eyeStyle={t.eyeStyle} bgRemove={ghostCutout} uri={ghostUri} eyeBoxes={refPhoto?.eyeBoxes} imgW={refPhoto?.imgW} imgH={refPhoto?.imgH} variant="plain" style={{ height: 70, borderRadius: 0, borderWidth: 0 }} />
               </View>
               <Txt mono style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 3 }}>REFERENCE</Txt>
             </View>
@@ -169,7 +180,13 @@ export default function CameraScreen({ route }) {
         <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, backgroundColor: '#0c0f14' }}>
           {overlayMode && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <Icon name="layers" size={17} color="rgba(255,255,255,0.6)" />
+              {ghostUri && BG_REMOVAL_AVAILABLE ? (
+                <Pressable onPress={() => setGhostCutout((v) => !v)} hitSlop={10} accessibilityLabel="Toggle background removal on overlay">
+                  <Icon name="layers" size={17} color={ghostCutout ? '#7fb2ff' : 'rgba(255,255,255,0.6)'} />
+                </Pressable>
+              ) : (
+                <Icon name="layers" size={17} color="rgba(255,255,255,0.6)" />
+              )}
               <Slider value={opacity} onChange={setOpacity} style={{ flex: 1 }} />
               <Txt mono style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', width: 34, textAlign: 'right' }}>{Math.round(opacity * 100)}%</Txt>
             </View>
