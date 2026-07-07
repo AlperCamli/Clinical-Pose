@@ -21,7 +21,9 @@ export default function PostFormatScreen({ route }) {
   const nav = useNav();
   const c = store.clients.find((x) => x.id === params.cid);
   const cs = c.cases.find((x) => x.id === params.caseId);
-  const [fmt, setFmt] = React.useState(params.cfg?.format ?? '4:5');
+  // Stories are full-screen by definition — the format is pinned to 9:16.
+  const storyMode = params.cfg?.mode === 'story';
+  const [fmt, setFmt] = React.useState(storyMode ? '9:16' : (params.cfg?.format ?? '4:5'));
   const cfg = { ...params.cfg, format: fmt };
 
   return (
@@ -31,19 +33,27 @@ export default function PostFormatScreen({ route }) {
         <PostPreview cfg={{ ...cfg, template: 'split', privacy: { logo: true } }} t={t} c={c} cs={cs} size={fmt === '9:16' ? 150 : 210} />
       </View>
       <View style={{ gap: 10 }}>
-        {FORMATS.map(([v, name, sub]) => (
-          <Card key={v} onPress={() => setFmt(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderWidth: fmt === v ? 1.5 : 1, borderColor: fmt === v ? C.accent : C.line }}>
-            <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{ width: v === '9:16' ? 22 : v === '4:5' ? 30 : 34, height: v === '9:16' ? 38 : v === '4:5' ? 38 : 34, borderWidth: 2, borderColor: fmt === v ? C.accent : C.ink3, borderRadius: 5 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Txt style={{ fontWeight: '600' }}>{name} <Txt mono style={{ fontSize: 12, color: C.ink3 }}>{v}</Txt></Txt>
-              <Txt style={{ fontSize: 12, color: C.ink3 }}>{sub}</Txt>
-            </View>
-            {fmt === v && <Icon name="check" size={18} color={C.accent} />}
-          </Card>
-        ))}
+        {FORMATS.map(([v, name, sub]) => {
+          const locked = storyMode && v !== '9:16';
+          return (
+            <Card key={v} onPress={locked ? undefined : () => setFmt(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderWidth: fmt === v ? 1.5 : 1, borderColor: fmt === v ? C.accent : C.line, opacity: locked ? 0.4 : 1 }}>
+              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: v === '9:16' ? 22 : v === '4:5' ? 30 : 34, height: v === '9:16' ? 38 : v === '4:5' ? 38 : 34, borderWidth: 2, borderColor: fmt === v ? C.accent : C.ink3, borderRadius: 5 }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Txt style={{ fontWeight: '600' }}>{name} <Txt mono style={{ fontSize: 12, color: C.ink3 }}>{v}</Txt></Txt>
+                <Txt style={{ fontSize: 12, color: C.ink3 }}>{sub}</Txt>
+              </View>
+              {fmt === v && <Icon name="check" size={18} color={C.accent} />}
+            </Card>
+          );
+        })}
       </View>
+      {storyMode && (
+        <Txt style={{ fontSize: 12.5, color: C.ink3, textAlign: 'center', marginTop: 12 }}>
+          Story posts are always full-screen 9:16.
+        </Txt>
+      )}
     </Wizard>
   );
 }

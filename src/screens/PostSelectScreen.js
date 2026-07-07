@@ -58,7 +58,11 @@ export default function PostSelectScreen({ route }) {
         })}
       </View>
       <SecLabel>Layout</SecLabel>
-      <Segmented options={[{ v: 'single', l: 'Single' }, { v: 'carousel', l: 'Carousel' }, { v: 'story', l: 'Story' }]} value={mode} onChange={setMode} />
+      <Segmented
+        options={[{ v: 'single', l: 'Single' }, { v: 'carousel', l: 'Carousel' }, { v: 'story', l: 'Story' }]}
+        value={mode}
+        onChange={(m) => { setMode(m); if (m === 'story') setFormat('9:16'); }}
+      />
       <Card onPress={() => nav.go('postFormat', { ...params, cfg: { sel, mode, format }, onPick: setFormat })}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, marginTop: 11 }}>
         <Txt style={{ fontWeight: '600', fontSize: 14.5 }}>Select Size</Txt>

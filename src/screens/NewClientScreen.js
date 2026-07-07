@@ -36,6 +36,7 @@ export default function NewClientScreen({ route }) {
     toast('Client created');
     if (params.after === 'newcase') nav.replace('treatmentPicker', { cid: c.id });
     else if (params.after === 'casesetup') nav.replace('caseSetup', { cid: c.id, tid: params.tid });
+    else if (params.after === 'appointment') nav.replace('appointmentSetup', { cid: c.id, date: params.date });
     else nav.replace('clientProfile', { cid: c.id });
   };
 

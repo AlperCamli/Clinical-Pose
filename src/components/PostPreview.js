@@ -11,7 +11,8 @@ import Icon from './Icon';
 import Photo from './Photo';
 import { C } from '../theme';
 import { TREATMENTS } from '../data/treatments';
-import { fmtDate, TODAY, reqAngles, beforeAfter, capturedSessions } from '../data/helpers';
+import { fmtDate, reqAngles, beforeAfter, capturedSessions } from '../data/helpers';
+import { todayISO } from '../data/clock';
 
 const RATIO = { '1:1': 1, '4:5': 0.8, '9:16': 0.5625 };
 
@@ -40,7 +41,7 @@ export default function PostPreview({ cfg, t, c, cs, size, bare }) {
   const tlCells = tl.length ? tl : [null, null, null]; // keep the 3-cell look when nothing's captured
 
   const dateFrom = before?.date || cs.started;
-  const dateTo = after?.date || TODAY;
+  const dateTo = after?.date || todayISO();
 
   return (
     <View style={{ width: W, height: H, borderRadius: 14, overflow: 'hidden', backgroundColor: '#0c0f14' }}>

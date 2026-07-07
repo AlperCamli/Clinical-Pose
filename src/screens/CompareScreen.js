@@ -119,6 +119,7 @@ export default function CompareScreen({ route }) {
       <TopBar onBack={nav.back} title="Compare" sub={`${TREATMENTS[cs.treatment].name} · ${c.name}`} border
         right={(
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <IconBtn name="tv" size={18} color={C.ink2} onPress={() => nav.go('presentation', { cid: c.id, caseId: cs.id })} accessibilityLabel="Present on TV" />
             {BG_REMOVAL_AVAILABLE && (
               <IconBtn name="layers" size={18} color={bg ? C.accentInk : C.ink2} onPress={() => setBg((v) => !v)} accessibilityLabel="Remove background" />
             )}
@@ -245,7 +246,12 @@ export default function CompareScreen({ route }) {
         )}
       </ScrollBody>
       <ActionBar>
-        <Btn variant="primary" lg block icon="image" iconSize={19} label="Create social post" onPress={() => nav.go('postSelect', { cid: c.id, caseId: cs.id })} />
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Btn variant="soft" lg icon="send" iconSize={18} label="Send to client" style={{ flex: 1 }}
+            onPress={() => nav.go('sendResults', { cid: c.id, caseId: cs.id })} />
+          <Btn variant="primary" lg icon="image" iconSize={19} label="Create post" style={{ flex: 1.2 }}
+            onPress={() => nav.go('postSelect', { cid: c.id, caseId: cs.id })} />
+        </View>
       </ActionBar>
     </Screen>
   );

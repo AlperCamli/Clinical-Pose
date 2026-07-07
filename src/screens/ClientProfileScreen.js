@@ -6,10 +6,12 @@ import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import TGlyph from '../components/TGlyph';
 import { TopBar, Card, Avatar, Tag, Chip, Switch, Btn, IconBtn, SecLabel, ConsentBadges, Sheet } from '../components/ui';
+import { AppointmentRow } from '../components/DayAgenda';
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { fmtDate } from '../data/helpers';
+import { upcoming, past } from '../data/appointments';
 
 export default function ClientProfileScreen({ route }) {
   const params = route.params || {};
@@ -17,7 +19,11 @@ export default function ClientProfileScreen({ route }) {
   const nav = useNav();
   const c = store.clients.find((x) => x.id === params.cid);
   const [consentOpen, setConsentOpen] = React.useState(false);
+  const [showPast, setShowPast] = React.useState(false);
   if (!c) return null;
+
+  const upAppts = upcoming(store.appointments, c.id);
+  const pastAppts = past(store.appointments, c.id);
 
   return (
     <Screen>
@@ -66,6 +72,36 @@ export default function ClientProfileScreen({ route }) {
           })}
         </View>
         <Btn variant="soft" lg block icon="plus" iconSize={18} label="New treatment case" onPress={() => nav.go('treatmentPicker', { cid: c.id })} />
+
+        <Spread style={{ marginHorizontal: 3, marginTop: 20, marginBottom: 10 }}>
+          <SecLabel style={{ margin: 0 }}>Appointments</SecLabel>
+          <Chip icon="plus" label="Book" onPress={() => nav.go('appointmentSetup', { cid: c.id })} />
+        </Spread>
+        {upAppts.length === 0 ? (
+          <Card pad style={{ marginBottom: 10 }}>
+            <Txt style={{ fontSize: 12.5, color: C.ink3 }}>No upcoming appointments for {c.name}.</Txt>
+          </Card>
+        ) : (
+          <View style={{ gap: 10, marginBottom: 10 }}>
+            {upAppts.map((a) => (
+              <AppointmentRow key={a.id} appt={a} client={c} showDate
+                onPress={() => nav.go('appointmentDetail', { aptId: a.id })} />
+            ))}
+          </View>
+        )}
+        {pastAppts.length > 0 && (
+          <View style={{ alignItems: 'center', marginBottom: 8 }}>
+            <Chip label={showPast ? 'Hide past' : `Past appointments (${pastAppts.length})`} onPress={() => setShowPast(!showPast)} />
+          </View>
+        )}
+        {showPast && (
+          <View style={{ gap: 10, marginBottom: 8 }}>
+            {pastAppts.map((a) => (
+              <AppointmentRow key={a.id} appt={a} client={c} showDate
+                onPress={() => nav.go('appointmentDetail', { aptId: a.id })} />
+            ))}
+          </View>
+        )}
       </ScrollBody>
 
       <Sheet open={consentOpen} onClose={() => setConsentOpen(false)} title="Consent record">

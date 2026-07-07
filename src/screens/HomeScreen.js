@@ -6,14 +6,21 @@ import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import TGlyph from '../components/TGlyph';
 import PostPreview from '../components/PostPreview';
-import { Card, Avatar, Tag, SecLabel, IconBtn } from '../components/ui';
+import { Card, Avatar, Tag, SecLabel, IconBtn, Chip } from '../components/ui';
+import { AppointmentRow } from '../components/DayAgenda';
 import { C, PAD, shadowBtn } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS } from '../data/treatments';
 import { RECENT } from '../data/seed';
 import { capCount, fmtDate, postToSlideCfg } from '../data/helpers';
+import { todayISO, fmtDayTitle } from '../data/clock';
+import { apptsOn } from '../data/appointments';
 
 const fmtTs = (ts) => (ts ? new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '');
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+};
 
 export default function HomeScreen() {
   const { store, t } = useApp();
@@ -37,6 +44,9 @@ export default function HomeScreen() {
   const startCase = () => nav.go('treatmentPicker', {});
   const findClient = () => nav.go('clientSearch', { mode: 'find' });
 
+  const today = todayISO();
+  const todaysAppts = apptsOn(store.appointments, today);
+
   return (
     <Screen>
       <ScrollBody contentStyle={{ paddingBottom: 12 }}>
@@ -50,14 +60,19 @@ export default function HomeScreen() {
               </View>
               <Txt style={{ fontWeight: '700', letterSpacing: -0.2 }}>Nature</Txt>
             </View>
-            <IconBtn name="settings" size={21} color={C.ink2} bare onPress={() => nav.go('settings')} accessibilityLabel="Settings" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconBtn name="calendar" size={21} color={C.ink2} bare onPress={() => nav.go('calendar')} accessibilityLabel="Calendar" />
+              <IconBtn name="settings" size={21} color={C.ink2} bare onPress={() => nav.go('settings')} accessibilityLabel="Settings" />
+            </View>
           </Spread>
         </View>
 
         {/* Greeting */}
         <View style={{ paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 4 }}>
-          <Txt style={{ fontSize: 13.5, fontWeight: '600', color: C.ink3 }}>Thursday · 4 June</Txt>
-          <Txt style={{ fontSize: 25, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 }}>Good morning, Dr. Demir</Txt>
+          <Txt style={{ fontSize: 13.5, fontWeight: '600', color: C.ink3 }}>{fmtDayTitle(today)}</Txt>
+          <Txt style={{ fontSize: 25, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 }}>
+            {greeting()}, {store.getSetting('doctorName')}
+          </Txt>
         </View>
 
         {/* Two CTAs */}
@@ -83,6 +98,34 @@ export default function HomeScreen() {
               <Txt style={{ fontSize: 12.5, color: C.ink3, marginTop: 3, fontWeight: '500' }}>Add an after / follow-up session</Txt>
             </View>
           </Card>
+        </View>
+
+        {/* Today's appointments */}
+        <View style={{ paddingHorizontal: PAD, paddingTop: 16, paddingBottom: 6 }}>
+          <Spread style={{ marginBottom: 10 }}>
+            <SecLabel style={{ margin: 0 }}>Today's appointments</SecLabel>
+            <Chip label="Calendar" onPress={() => nav.go('calendar')} />
+          </Spread>
+          {todaysAppts.length === 0 ? (
+            <Card pad style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="calendar" size={19} color={C.ink3} />
+              </View>
+              <Txt style={{ flex: 1, fontSize: 12.5, color: C.ink3 }}>No appointments today.</Txt>
+              <Chip accent on label="Book" onPress={() => nav.go('appointmentSetup', { date: today })} />
+            </Card>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {todaysAppts.map((a) => (
+                <AppointmentRow
+                  key={a.id}
+                  appt={a}
+                  client={store.clients.find((x) => x.id === a.clientId)}
+                  onPress={() => nav.go('appointmentDetail', { aptId: a.id })}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Active cases */}
@@ -148,6 +191,7 @@ function ActiveCard({ c, cs, last, nav }) {
 
 function PostRow({ c, cs, post, t, first, nav }) {
   const shared = post.status === 'shared';
+  const scheduled = !shared && !!post.scheduledAt;
   return (
     <Pressable
       onPress={() => nav.go('postDetail', { cid: c.id, caseId: cs.id, postId: post.id })}
@@ -157,7 +201,7 @@ function PostRow({ c, cs, post, t, first, nav }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Txt style={{ fontWeight: '600', fontSize: 14.5 }} numberOfLines={1}>{c.name}</Txt>
-          <Tag variant={shared ? 'ok' : 'accent'} dot>{shared ? 'Shared' : 'Ready'}</Tag>
+          <Tag variant={shared ? 'ok' : scheduled ? 'warn' : 'accent'} dot>{shared ? 'Shared' : scheduled ? 'Scheduled' : 'Ready'}</Tag>
         </View>
         <Txt style={{ fontSize: 12, color: C.ink3 }} numberOfLines={1}>{TREATMENTS[cs.treatment].name} · {post.mode || 'single'}</Txt>
       </View>

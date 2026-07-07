@@ -44,7 +44,7 @@ export default function TimelineScreen({ route }) {
         </Card>
 
         <Card onPress={() => nav.go('postHistory', { cid: c.id, caseId: cs.id })}
-          style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 }}>
+          style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 }}>
           <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.accentWash, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="image" size={19} color={C.accentInk} />
           </View>
@@ -55,6 +55,14 @@ export default function TimelineScreen({ route }) {
           <Tag>{String((cs.posts || []).length)}</Tag>
           <Icon name="chevR" size={17} color={C.ink3} />
         </Card>
+
+        {/* client-facing actions: result documentation + consult-room TV mode */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+          <Btn variant="soft" icon="send" iconSize={17} label="Send to client" style={{ flex: 1 }}
+            onPress={() => nav.go('sendResults', { cid: c.id, caseId: cs.id })} />
+          <Btn variant="soft" icon="tv" iconSize={17} label="Present on TV" style={{ flex: 1 }}
+            onPress={() => nav.go('presentation', { cid: c.id, caseId: cs.id })} />
+        </View>
 
         <Spread style={{ marginHorizontal: 3, marginBottom: 12 }}>
           <SecLabel style={{ margin: 0 }}>Session history</SecLabel>

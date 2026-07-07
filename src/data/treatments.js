@@ -80,6 +80,67 @@ export const TREATMENTS = {
 
 export const TREATMENT_LIST = ['lip', 'botox', 'nose', 'jaw', 'eye', 'skin', 'hair', 'custom'];
 
+// ---- client-facing message templates (Turkish defaults — launch market) ----
+// Tokens: {client} {clinic} {doctor} {treatment} {date} {time}. Rendering +
+// per-clinic overrides live in src/data/messages.js; clinics edit these in
+// Settings → Message templates. {treatment} resolves to `nameTr` below.
+const MSG_DEFAULTS = {
+  reminder: 'Merhaba {client}, {clinic} olarak hatırlatmak isteriz: {date} günü saat {time}\'te {doctor} ile {treatment} randevunuz bulunmaktadır. Görüşmek üzere!',
+  preCare: 'Merhaba {client}, {treatment} randevunuz öncesinde bol su içmenizi ve işlem bölgesine makyaj yapmadan gelmenizi rica ederiz. Sorularınız için bize yazabilirsiniz. — {clinic}',
+  afterCare: 'Merhaba {client}, {treatment} işleminiz sonrasında ilk 24 saat işlem bölgesine dokunmaktan ve yoğun egzersizden kaçınınız. Olağan dışı bir durumda bize ulaşın. Geçmiş olsun! — {clinic}',
+  resultText: 'Merhaba {client}, {treatment} sürecinizin öncesi/sonrası karşılaştırmasını bilginize sunarız. Sağlıklı günler dileriz. — {clinic}',
+  caption: '{treatment} — doğal sonuçlar ✨ {clinic}',
+};
+
+const MSG_OVERRIDES = {
+  lip: {
+    preCare: 'Merhaba {client}, {treatment} randevunuzdan 24 saat önce alkol ve kan sulandırıcı (aspirin vb.) kullanmamanızı rica ederiz. Uçuk geçmişiniz varsa lütfen önceden bildirin. — {clinic}',
+    afterCare: 'Merhaba {client}, {treatment} sonrası ilk 24 saat dudaklarınıza masaj yapmayın, sıcak içecek ve güneşten kaçının; hafif şişlik normaldir, soğuk kompres uygulayabilirsiniz. Geçmiş olsun! — {clinic}',
+  },
+  botox: {
+    preCare: 'Merhaba {client}, {treatment} randevunuzdan 24 saat önce alkol almamanızı ve kan sulandırıcı kullanmamanızı rica ederiz. — {clinic}',
+    afterCare: 'Merhaba {client}, {treatment} sonrası 4 saat boyunca yatmayınız, işlem bölgesine masaj yapmayınız ve aynı gün ağır egzersizden kaçınınız. Geçmiş olsun! — {clinic}',
+  },
+  nose: {
+    afterCare: 'Merhaba {client}, {treatment} sonrası doktorunuzun önerdiği bakım planına uyunuz; ilk hafta gözlük kullanmaktan ve burnunuza baskıdan kaçının. Geçmiş olsun! — {clinic}',
+  },
+  hair: {
+    preCare: 'Merhaba {client}, {treatment} randevunuzdan 3 gün önce alkol kullanmamanızı, işlem günü rahat ve önden düğmeli bir kıyafetle gelmenizi rica ederiz. — {clinic}',
+    afterCare: 'Merhaba {client}, {treatment} sonrası ilk 3 gün ekim bölgesine dokunmayın, ilk yıkamayı kliniğimizde yaptırın ve güneşten koruyun. Geçmiş olsun! — {clinic}',
+  },
+};
+
+const NAMES_TR = {
+  lip: 'Dudak Dolgusu', botox: 'Botoks', nose: 'Burun Estetiği', jaw: 'Çene Hattı Dolgusu',
+  eye: 'Göz Altı Dolgusu', skin: 'Cilt Yenileme', hair: 'Saç Ekimi', custom: 'Kişisel Protokol',
+};
+
+const DESCRIPTIONS_TR = {
+  lip: 'Hyalüronik asit bazlı dudak dolgusu; doğal hacim ve kontur sağlar. Etkisi ortalama 6–12 ay sürer.',
+  botox: 'Mimik kaslarına uygulanan botulinum toksini; kırışıklıkların görünümünü azaltır. Etkisi 3–6 ay sürer.',
+  nose: 'Burun şeklinin cerrahi veya dolgu ile yeniden şekillendirilmesi; nihai sonuç 6–12 ayda oturur.',
+  jaw: 'Çene hattı ve çene ucuna uygulanan dolgu ile daha belirgin bir alt yüz konturu hedeflenir.',
+  eye: 'Göz altı ışık dolgusu; morluk ve çöküntü görünümünü azaltır, dinlenmiş bir bakış sağlar.',
+  skin: 'Cilt kalitesini artırmaya yönelik mezoterapi/cilt gençleştirme protokolü; seanslar halinde uygulanır.',
+  hair: 'FUE/DHI teknikleriyle saç ekimi; nihai yoğunluk 12. ayda değerlendirilir.',
+  custom: 'Kliniğinize özel tanımlanmış tedavi protokolü.',
+};
+
+for (const id of TREATMENT_LIST) {
+  TREATMENTS[id].nameTr = NAMES_TR[id] || TREATMENTS[id].name;
+  TREATMENTS[id].description = DESCRIPTIONS_TR[id] || '';
+  TREATMENTS[id].msg = { ...MSG_DEFAULTS, ...(MSG_OVERRIDES[id] || {}) };
+}
+
+// Fields a clinic can override per treatment (Settings → Message templates).
+export const MSG_FIELDS = [
+  ['reminder', 'Appointment reminder'],
+  ['preCare', 'Before the visit'],
+  ['afterCare', 'After-care'],
+  ['resultText', 'With result photos'],
+  ['caption', 'Social caption'],
+];
+
 // ---- session type presets ----
 export const BEFORE_LABELS = ['Initial Before', 'Pre-treatment', 'First Visit', 'Baseline'];
 export const AFTER_LABELS = [

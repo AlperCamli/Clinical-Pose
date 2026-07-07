@@ -1,7 +1,6 @@
 // ============ NATURE — data helpers ============
+// (the old hardcoded TODAY mock is gone — real dates live in ./clock)
 import { TREATMENTS } from './treatments';
-
-export const TODAY = '2026-06-04';
 
 export function fmtDate(iso) {
   const d = new Date(iso + 'T00:00:00');

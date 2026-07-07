@@ -35,6 +35,14 @@ const ICONS = {
   calendar: (s) => [<Rect key="a" x={3} y={5} width={18} height={16} rx={2.5} {...s} />, <Path key="b" d="M3 9h18M8 3v4M16 3v4" {...s} />],
   align:    (s) => [<Rect key="a" x={4} y={4} width={16} height={16} rx={2} {...s} />, <Path key="b" d="M12 4v16M4 12h16" {...s} />],
   home:     (s) => [<Path key="a" d="M4 11 12 4l8 7" {...s} />, <Path key="b" d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" {...s} />],
+  bell:     (s) => [<Path key="a" d="M6 9a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9Z" {...s} />, <Path key="b" d="M10 19.5a2.2 2.2 0 0 0 4 0" {...s} />],
+  message:  (s) => [<Path key="a" d="M21 12a8 8 0 0 1-8 8H4l1.6-3.2A8 8 0 1 1 21 12Z" {...s} />, <Path key="b" d="M8.5 10.5h7M8.5 14h4.5" {...s} />],
+  video:    (s) => [<Rect key="a" x={3} y={6} width={13} height={12} rx={2.5} {...s} />, <Path key="b" d="m16 10.5 5-3v9l-5-3" {...s} />],
+  tv:       (s) => [<Rect key="a" x={3} y={5} width={18} height={13} rx={2.5} {...s} />, <Path key="b" d="M8 21h8" {...s} />],
+  play:     (s) => [<Path key="a" d="M8 5.5v13l11-6.5-11-6.5Z" {...s} />],
+  pause:    (s) => [<Path key="a" d="M8 5v14M16 5v14" {...s} />],
+  send:     (s) => [<Path key="a" d="M21 3 10.5 13.5" {...s} />, <Path key="b" d="M21 3 14 21l-3.5-7.5L3 10l18-7Z" {...s} />],
+  trash:    (s) => [<Path key="a" d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" {...s} />, <Path key="b" d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" {...s} />, <Path key="c" d="M10 11v6M14 11v6" {...s} />],
 };
 
 export default function Icon({ name, size = 20, stroke = 2, color = '#1c2530', style }) {

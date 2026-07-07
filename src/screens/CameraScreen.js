@@ -79,7 +79,8 @@ export default function CameraScreen({ route }) {
     try {
       // skipProcessing:false so the saved file has orientation baked in — keeps
       // ML Kit's coordinate space, Image.getSize() and the on-screen <Image> aligned.
-      const p = await camRef.current?.takePictureAsync({ quality: 0.8, skipProcessing: false });
+      // quality 1: clinical archive shots keep full JPEG quality (SDK 56 default).
+      const p = await camRef.current?.takePictureAsync({ quality: 1, skipProcessing: false });
       uri = p?.uri;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) { /* simulator / no camera — continue without a real image */ }

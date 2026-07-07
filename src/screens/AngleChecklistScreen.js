@@ -69,6 +69,8 @@ export default function AngleChecklistScreen({ route }) {
         </Card>
         <Btn variant="soft" block icon="plus" iconSize={17} label="Add extra photo"
           onPress={() => nav.go('camera', { ...params, startIdx: Math.max(0, firstMissing), extra: true })} />
+        <Btn variant="ghost" block icon="video" iconSize={17} label="Record guided video" style={{ marginTop: 6 }}
+          onPress={() => nav.go('videoCapture', { cid: params.cid, caseId: params.caseId, sessionId: params.sessionId })} />
       </ScrollBody>
       <ActionBar>
         {got < reqd.length ? (

@@ -8,7 +8,8 @@ import { TopBar, ActionBar, Card, Tag, Chip, Field, Btn } from '../components/ui
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS, AFTER_LABELS } from '../data/treatments';
-import { fmtDateLong, uid, TODAY } from '../data/helpers';
+import { fmtDateLong, uid } from '../data/helpers';
+import { todayISO } from '../data/clock';
 
 const REF_OPTIONS = [
   ['baseline', 'Baseline before', 'Align to the very first photos'],
@@ -27,7 +28,7 @@ export default function SessionSetupScreen({ route }) {
   const isAfter = !/before/i.test(label);
 
   const start = () => {
-    const session = { id: uid(), kind: isAfter ? 'after' : 'before', label, date: TODAY, photos: {}, refSource: ref };
+    const session = { id: uid(), kind: isAfter ? 'after' : 'before', label, date: todayISO(), photos: {}, refSource: ref };
     store.addSession(c.id, cs.id, session);
     nav.replace('angleChecklist', { cid: c.id, caseId: cs.id, sessionId: session.id });
   };
@@ -44,7 +45,7 @@ export default function SessionSetupScreen({ route }) {
         <Field label="Date">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.line2, backgroundColor: C.surface, borderRadius: 13, paddingVertical: 13, paddingHorizontal: 14 }}>
             <Icon name="calendar" size={18} color={C.ink3} />
-            <Txt>{fmtDateLong(TODAY)}</Txt>
+            <Txt>{fmtDateLong(todayISO())}</Txt>
             <Tag style={{ marginLeft: 'auto' }}>Today</Tag>
           </View>
         </Field>

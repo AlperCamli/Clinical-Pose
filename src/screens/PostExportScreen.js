@@ -1,17 +1,21 @@
 // ============ NATURE — Create Post 5: Export / Share queue ============
 import React from 'react';
 import { View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Screen, ScrollBody } from '../components/Screen';
 import Txt from '../components/Txt';
 import Icon from '../components/Icon';
 import PostPreview from '../components/PostPreview';
-import { TopBar, ActionBar, Card, Btn, Tag } from '../components/ui';
+import { TopBar, ActionBar, Card, Btn, Tag, Chip, Sheet } from '../components/ui';
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { captureAsset } from '../data/postCapture';
-import { savePostToGallery, sharePost } from '../data/posts';
+import { savePostToGallery, sharePostSet } from '../data/posts';
 import { removeBg } from '../data/backgroundRemoval';
 import { buildQueue, postToSlideCfg, beforeAfter, capturedSessions, DEFAULT_POST_PRIVACY, uid } from '../data/helpers';
+import { buildMessage } from '../data/messages';
+import { schedulePostReminder, NOTIFICATIONS_AVAILABLE } from '../data/notifications';
+import { todayISO, addDaysISO, atTime, fmtTime } from '../data/clock';
 
 // Off-screen render size (points). Captured & scaled up to POST_PX so the asset is
 // crisp while the on-screen preview stays small.
@@ -27,8 +31,19 @@ export default function PostExportScreen({ route }) {
   const cs = c?.cases.find((x) => x.id === params.caseId);
   const cfg = params.cfg || {};
   const [busy, setBusy] = React.useState(null); // post id (or 'all') currently working
+  const [remindFor, setRemindFor] = React.useState(null); // post id awaiting a reminder time (E2)
   const refs = React.useRef({});
   const createdRef = React.useRef(false);
+
+  const remindOptions = React.useMemo(() => {
+    const today = todayISO();
+    return [
+      { label: 'Tonight 19:00', ms: atTime(today, '19:00') },
+      { label: 'Tomorrow 12:00', ms: atTime(addDaysISO(today, 1), '12:00') },
+      { label: 'Tomorrow 19:00', ms: atTime(addDaysISO(today, 1), '19:00') },
+      { label: 'In 3 days 12:00', ms: atTime(addDaysISO(today, 3), '12:00') },
+    ].filter((o) => o.ms > Date.now());
+  }, []);
 
   // The share queue: carousel = one post (all slides); single/story = one per angle.
   const posts = React.useMemo(() => {
@@ -103,11 +118,29 @@ export default function PostExportScreen({ route }) {
     try {
       const uris = await renderPost(post);
       for (const u of uris) await savePostToGallery(u); // eslint-disable-line no-await-in-loop
-      const ok = await sharePost(uris);
+      const { shared } = await sharePostSet(uris);
       store.markPostShared(c.id, cs.id, post.id);
-      if (!ok) toast('Saved · sharing unavailable here');
-      else toast(uris.length > 1 ? 'Shared slide 1 · set saved to gallery' : 'Shared');
+      if (!shared) toast('Saved · sharing unavailable here');
+      else if (uris.length > shared) toast(`Shared slide 1 · all ${uris.length} saved to gallery`);
+      else toast(shared > 1 ? 'All slides shared' : 'Shared');
     } catch (e) { onErr(e); } finally { setBusy(null); }
+  }
+
+  // E2 — "remind me to post": a local notification that deep-links back here
+  async function onRemind(whenMs) {
+    const postId = remindFor;
+    setRemindFor(null);
+    if (!NOTIFICATIONS_AVAILABLE) { toast('Reminders need a dev build'); return; }
+    const id = await schedulePostReminder({ cid: c.id, caseId: cs.id, postId }, whenMs);
+    if (!id) { toast('Could not schedule (permission?)'); return; }
+    store.schedulePost(c.id, cs.id, postId, whenMs, id);
+    toast(`Reminder set · ${fmtTime(whenMs)}`);
+  }
+
+  async function copyCaption() {
+    const caption = buildMessage('caption', { client: c, tid: cs.treatment, getSetting: store.getSetting });
+    await Clipboard.setStringAsync(caption);
+    toast('Caption copied');
   }
 
   async function onSaveAll() {
@@ -136,7 +169,9 @@ export default function PostExportScreen({ route }) {
 
         <View style={{ gap: 14 }}>
           {posts.map((post) => {
+            const live = cs.posts?.find((p) => p.id === post.id);
             const shared = liveStatus(post.id) === 'shared';
+            const scheduled = !shared && !!live?.scheduledAt;
             const working = busy === post.id;
             return (
               <Card key={post.id} pad style={{ gap: 12 }}>
@@ -145,11 +180,15 @@ export default function PostExportScreen({ route }) {
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <Txt style={{ fontWeight: '700', fontSize: 15, textTransform: 'capitalize' }}>{post.mode || 'single'}</Txt>
-                      <Tag variant={shared ? 'ok' : 'accent'} dot>{shared ? 'Shared' : 'Ready'}</Tag>
+                      <Tag variant={shared ? 'ok' : scheduled ? 'warn' : 'accent'} dot>{shared ? 'Shared' : scheduled ? 'Scheduled' : 'Ready'}</Tag>
                     </View>
                     <Txt mono style={{ fontSize: 11.5, color: C.ink3 }}>
                       {post.format} · {post.slides.length > 1 ? `${post.slides.length} slides` : post.slides[0]?.template}
                     </Txt>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                      <Chip icon="bell" label={scheduled ? 'Reschedule' : 'Remind me'} onPress={() => setRemindFor(post.id)} />
+                      <Chip icon="note" label="Caption" onPress={copyCaption} />
+                    </View>
                   </View>
                 </View>
                 <Btn variant={shared ? 'default' : 'primary'} icon="share" iconSize={18} disabled={!!busy} label={working ? 'Working…' : shared ? 'Share again' : 'Share'} onPress={() => onShare(post)} />
@@ -174,6 +213,17 @@ export default function PostExportScreen({ route }) {
       <ActionBar>
         <Btn variant="primary" lg block icon="check" iconSize={19} label="Finish" disabled={!!busy} onPress={() => { toast('Done'); nav.popTo('timeline', { cid: c.id, caseId: cs.id }); }} />
       </ActionBar>
+
+      <Sheet open={!!remindFor} onClose={() => setRemindFor(null)} title="Remind me to post">
+        <Txt style={{ fontSize: 13, color: C.ink3, marginBottom: 14 }}>
+          A notification will bring you back to this post at the chosen time.
+        </Txt>
+        <View style={{ gap: 8 }}>
+          {remindOptions.map((o) => (
+            <Btn key={o.label} variant="soft" block icon="bell" label={o.label} onPress={() => onRemind(o.ms)} />
+          ))}
+        </View>
+      </Sheet>
     </Screen>
   );
 }

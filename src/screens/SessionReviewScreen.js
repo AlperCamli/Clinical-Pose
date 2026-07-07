@@ -106,11 +106,39 @@ export default function SessionReviewScreen({ route }) {
           <Icon name="shield" size={14} color={C.ink3} style={{ marginTop: 1 }} />
           <Txt style={{ flex: 1, fontSize: 12.5, color: C.ink3 }}>Originals are stored untouched. Eye-hidden display versions are generated separately for sharing.</Txt>
         </View>
+
+        {/* clinical videos attached to this session */}
+        <View style={{ marginTop: 16 }}>
+          {(s.videos || []).length > 0 && (
+            <Card style={{ marginBottom: 10 }}>
+              {s.videos.map((v, i) => (
+                <Pressable key={v.id}
+                  onPress={() => nav.go('videoPlayer', { cid: c.id, caseId: cs.id, sessionId: s.id, videoId: v.id })}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: PAD, borderTopWidth: i ? 1 : 0, borderTopColor: C.line }}>
+                  <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: C.accentWash, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="play" size={17} color={C.accentInk} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt style={{ fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{v.label || 'Clinical video'}</Txt>
+                    <Txt mono style={{ fontSize: 11.5, color: C.ink3, marginTop: 1 }}>
+                      {v.durationSec ? `${Math.round(v.durationSec)}s` : ''}{v.fileMissing ? ' · file missing' : ''}
+                    </Txt>
+                  </View>
+                  <Icon name="chevR" size={16} color={C.ink3} />
+                </Pressable>
+              ))}
+            </Card>
+          )}
+          <Btn variant="soft" block icon="video" iconSize={17} label="Record guided video"
+            onPress={() => nav.go('videoCapture', { cid: c.id, caseId: cs.id, sessionId: s.id })} />
+        </View>
       </ScrollBody>
       <ActionBar>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {hasBefore && <Btn variant="soft" icon="slider" iconSize={18} label="Compare" onPress={() => nav.go('compare', { cid: c.id, caseId: cs.id })} style={{ flex: 1 }} />}
           <Btn variant="primary" icon="check" iconSize={18} label="Save session" onPress={() => {
+            // A capture that started from an appointment completes it (A6).
+            if (params.aptId) store.setAppointmentStatus(params.aptId, 'completed');
             toast('Session saved');
             // Land on the Timeline hub with a clean back chain (→ client → home),
             // regardless of whether we came via the capture wizard or the timeline.

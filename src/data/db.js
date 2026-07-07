@@ -57,23 +57,59 @@ CREATE TABLE IF NOT EXISTS posts (
   serverId TEXT,
   caseId TEXT NOT NULL,
   mode TEXT, format TEXT, slides TEXT, status TEXT,
-  createdAt INTEGER, sharedAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
+  createdAt INTEGER, sharedAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1,
+  scheduledAt INTEGER, scheduledNotifId TEXT
+);
+CREATE TABLE IF NOT EXISTS appointments (
+  id TEXT PRIMARY KEY NOT NULL,
+  serverId TEXT,
+  clientId TEXT NOT NULL,
+  caseId TEXT,
+  practitioner TEXT, treatment TEXT,
+  startAt INTEGER NOT NULL, durationMin INTEGER DEFAULT 30,
+  status TEXT DEFAULT 'booked',
+  notes TEXT,
+  reminderLeadMins TEXT,
+  notificationIds TEXT,
+  reminderSentAt INTEGER,
+  sessionId TEXT,
+  createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT,
+  updatedAt INTEGER, dirty INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS videos (
+  id TEXT PRIMARY KEY NOT NULL,
+  serverId TEXT,
+  sessionId TEXT NOT NULL,
+  label TEXT, localUri TEXT, videoKey TEXT,
+  galleryAssetId TEXT, galleryUri TEXT, fileMissing INTEGER DEFAULT 0,
+  durationSec REAL,
+  createdAt INTEGER, updatedAt INTEGER, dirty INTEGER DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(clientId);
 CREATE INDEX IF NOT EXISTS idx_sessions_case ON sessions(caseId);
 CREATE INDEX IF NOT EXISTS idx_photos_session ON photos(sessionId);
 CREATE INDEX IF NOT EXISTS idx_posts_case ON posts(caseId);
+CREATE INDEX IF NOT EXISTS idx_appts_client ON appointments(clientId);
+CREATE INDEX IF NOT EXISTS idx_appts_start ON appointments(startAt);
+CREATE INDEX IF NOT EXISTS idx_videos_session ON videos(sessionId);
 `;
 
 // Schema version. v1 recovered the corrupted seed (non-unique ids). v2 adds eye
 // redaction columns. v3 adds stable photo keys + gallery recovery metadata. v4
 // adds the social-post history table (created via CREATE TABLE IF NOT EXISTS, so
 // no ALTER migration is needed). v5 adds the per-photo background-removal flag.
-// Additive migrations preserve on-device data.
-const DB_VERSION = 5;
+// v6 adds appointments/settings/videos tables (CREATE TABLE IF NOT EXISTS — no
+// ALTER needed) plus post-scheduling columns. Additive migrations preserve
+// on-device data.
+const DB_VERSION = 6;
 const V2_PHOTO_COLS = ['eyeBoxes TEXT', 'eyeDetected INTEGER', 'imgW INTEGER', 'imgH INTEGER'];
 const V3_PHOTO_COLS = ['photoKey TEXT', 'galleryAssetId TEXT', 'galleryUri TEXT', 'fileMissing INTEGER DEFAULT 0'];
 const V5_PHOTO_COLS = ['bgRemove INTEGER DEFAULT 0'];
+const V6_POST_COLS = ['scheduledAt INTEGER', 'scheduledNotifId TEXT'];
 
 export async function initDB() {
   const db = await getDB();
@@ -106,6 +142,11 @@ export async function initDB() {
   if (current >= 1 && current < 5) {
     for (const col of V5_PHOTO_COLS) {
       try { await db.execAsync(`ALTER TABLE photos ADD COLUMN ${col}`); } catch { /* column exists */ }
+    }
+  }
+  if (current >= 4 && current < 6) {
+    for (const col of V6_POST_COLS) {
+      try { await db.execAsync(`ALTER TABLE posts ADD COLUMN ${col}`); } catch { /* column exists */ }
     }
   }
 
@@ -211,15 +252,104 @@ export async function upsertPost(caseId, post) {
   const db = await getDB();
   const ts = Date.now();
   await db.runAsync(
-    `INSERT INTO posts (id, serverId, caseId, mode, format, slides, status, createdAt, sharedAt, updatedAt, dirty)
-     VALUES (?,?,?,?,?,?,?,?,?,?,1)
+    `INSERT INTO posts (id, serverId, caseId, mode, format, slides, status, createdAt, sharedAt, updatedAt, dirty, scheduledAt, scheduledNotifId)
+     VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?)
      ON CONFLICT(id) DO UPDATE SET
        mode=excluded.mode, format=excluded.format, slides=excluded.slides, status=excluded.status,
-       sharedAt=excluded.sharedAt, updatedAt=excluded.updatedAt, dirty=1`,
+       sharedAt=excluded.sharedAt, updatedAt=excluded.updatedAt, dirty=1,
+       scheduledAt=excluded.scheduledAt, scheduledNotifId=excluded.scheduledNotifId`,
     [post.id, post.serverId ?? null, caseId, post.mode ?? null, post.format ?? null,
       JSON.stringify(post.slides ?? []), post.status ?? 'ready',
-      post.createdAt ?? ts, post.sharedAt ?? null, ts]
+      post.createdAt ?? ts, post.sharedAt ?? null, ts,
+      post.scheduledAt ?? null, post.scheduledNotifId ?? null]
   );
+}
+
+// ---------------- appointments ----------------
+export async function upsertAppointment(a, createdAt) {
+  const db = await getDB();
+  const ts = Date.now();
+  await db.runAsync(
+    `INSERT INTO appointments (id, serverId, clientId, caseId, practitioner, treatment, startAt, durationMin,
+       status, notes, reminderLeadMins, notificationIds, reminderSentAt, sessionId, createdAt, updatedAt, dirty)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+     ON CONFLICT(id) DO UPDATE SET
+       clientId=excluded.clientId, caseId=excluded.caseId, practitioner=excluded.practitioner,
+       treatment=excluded.treatment, startAt=excluded.startAt, durationMin=excluded.durationMin,
+       status=excluded.status, notes=excluded.notes, reminderLeadMins=excluded.reminderLeadMins,
+       notificationIds=excluded.notificationIds, reminderSentAt=excluded.reminderSentAt,
+       sessionId=excluded.sessionId, updatedAt=excluded.updatedAt, dirty=1`,
+    [a.id, a.serverId ?? null, a.clientId, a.caseId ?? null, a.practitioner ?? '', a.treatment ?? null,
+      a.startAt, a.durationMin ?? 30, a.status ?? 'booked', a.notes ?? '',
+      JSON.stringify(a.reminderLeadMins ?? []), JSON.stringify(a.notificationIds ?? []),
+      a.reminderSentAt ?? null, a.sessionId ?? null, createdAt ?? ts, ts]
+  );
+}
+
+export async function loadAppointments() {
+  const db = await getDB();
+  const rows = await db.getAllAsync('SELECT * FROM appointments ORDER BY startAt ASC, rowid ASC');
+  return rows.map((a) => {
+    let leads; let notifIds;
+    try { leads = a.reminderLeadMins ? JSON.parse(a.reminderLeadMins) : []; } catch { leads = []; }
+    try { notifIds = a.notificationIds ? JSON.parse(a.notificationIds) : []; } catch { notifIds = []; }
+    return {
+      id: a.id, clientId: a.clientId, caseId: a.caseId || undefined,
+      practitioner: a.practitioner, treatment: a.treatment || undefined,
+      startAt: a.startAt, durationMin: a.durationMin || 30, status: a.status || 'booked',
+      notes: a.notes || '', reminderLeadMins: leads, notificationIds: notifIds,
+      reminderSentAt: a.reminderSentAt || undefined, sessionId: a.sessionId || undefined,
+    };
+  });
+}
+
+export async function deleteAppointmentRow(id) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM appointments WHERE id=?', [id]);
+}
+
+// ---------------- settings (KV, JSON values) ----------------
+export async function getSettingsMap() {
+  const db = await getDB();
+  const rows = await db.getAllAsync('SELECT key, value FROM settings');
+  const map = {};
+  for (const r of rows) {
+    try { map[r.key] = r.value != null ? JSON.parse(r.value) : null; } catch { /* skip corrupt value */ }
+  }
+  return map;
+}
+
+export async function putSetting(key, value) {
+  const db = await getDB();
+  await db.runAsync(
+    `INSERT INTO settings (key, value, updatedAt, dirty) VALUES (?,?,?,1)
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updatedAt=excluded.updatedAt, dirty=1`,
+    [key, JSON.stringify(value ?? null), Date.now()]
+  );
+}
+
+// ---------------- videos ----------------
+export async function upsertVideo(sessionId, v, createdAt) {
+  const db = await getDB();
+  const ts = Date.now();
+  await db.runAsync(
+    `INSERT INTO videos (id, serverId, sessionId, label, localUri, videoKey, galleryAssetId, galleryUri,
+       fileMissing, durationSec, createdAt, updatedAt, dirty)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
+     ON CONFLICT(id) DO UPDATE SET
+       label=excluded.label, localUri=excluded.localUri, videoKey=excluded.videoKey,
+       galleryAssetId=excluded.galleryAssetId, galleryUri=excluded.galleryUri,
+       fileMissing=excluded.fileMissing, durationSec=excluded.durationSec,
+       updatedAt=excluded.updatedAt, dirty=1`,
+    [v.id, v.serverId ?? null, sessionId, v.label ?? '', v.uri ?? null, v.videoKey ?? null,
+      v.galleryAssetId ?? null, v.galleryUri ?? null, v.fileMissing ? 1 : 0,
+      v.durationSec ?? null, createdAt ?? ts, ts]
+  );
+}
+
+export async function deleteVideoRow(id) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM videos WHERE id=?', [id]);
 }
 
 // Insert a whole case subtree (case → sessions → photos), used by addCase.
@@ -232,37 +362,60 @@ export async function upsertCaseGraph(clientId, cs) {
 }
 
 // ---------------- seed ----------------
-export async function seedIfEmpty(seedClients) {
+export async function seedIfEmpty(seedClients, seedAppointments) {
   const db = await getDB();
   const row = await db.getFirstAsync('SELECT COUNT(*) AS n FROM clients');
-  if (row && row.n > 0) return;
-  const base = Date.now();
-  await db.withTransactionAsync(async () => {
-    for (let ci = 0; ci < seedClients.length; ci++) {
-      const c = seedClients[ci];
-      await upsertClient(c, base - ci); // earlier seeds sort first (DESC)
-      for (let csi = 0; csi < c.cases.length; csi++) {
-        const cs = c.cases[csi];
-        await upsertCase(c.id, cs, base - csi);
-        for (let si = 0; si < cs.sessions.length; si++) {
-          const s = cs.sessions[si];
-          await upsertSession(cs.id, s, base + si); // earlier sessions sort first (ASC)
-          for (const [aid, rec] of Object.entries(s.photos || {})) await upsertPhoto(s.id, aid, rec, base + si);
+  if (!row || row.n === 0) {
+    const base = Date.now();
+    await db.withTransactionAsync(async () => {
+      for (let ci = 0; ci < seedClients.length; ci++) {
+        const c = seedClients[ci];
+        await upsertClient(c, base - ci); // earlier seeds sort first (DESC)
+        for (let csi = 0; csi < c.cases.length; csi++) {
+          const cs = c.cases[csi];
+          await upsertCase(c.id, cs, base - csi);
+          for (let si = 0; si < cs.sessions.length; si++) {
+            const s = cs.sessions[si];
+            await upsertSession(cs.id, s, base + si); // earlier sessions sort first (ASC)
+            for (const [aid, rec] of Object.entries(s.photos || {})) await upsertPhoto(s.id, aid, rec, base + si);
+          }
         }
       }
+    });
+  }
+  // Demo appointments seed behind their own guard so pre-v6 installs (which
+  // already have clients) still get them once.
+  if (seedAppointments?.length) {
+    const apRow = await db.getFirstAsync('SELECT COUNT(*) AS n FROM appointments');
+    if (!apRow || apRow.n === 0) {
+      const [clientRows, caseRows] = await Promise.all([
+        db.getAllAsync('SELECT id FROM clients'),
+        db.getAllAsync('SELECT id FROM cases'),
+      ]);
+      const clientIds = new Set(clientRows.map((r) => r.id));
+      const caseIds = new Set(caseRows.map((r) => r.id));
+      const validAppointments = seedAppointments.filter((a) =>
+        clientIds.has(a.clientId) && (!a.caseId || caseIds.has(a.caseId))
+      );
+      if (!validAppointments.length) return;
+      const base = Date.now();
+      await db.withTransactionAsync(async () => {
+        for (let i = 0; i < validAppointments.length; i++) await upsertAppointment(validAppointments[i], base + i);
+      });
     }
-  });
+  }
 }
 
 // ---------------- hydrate ----------------
 export async function loadAll() {
   const db = await getDB();
-  const [clientRows, caseRows, sessionRows, photoRows, postRows] = await Promise.all([
+  const [clientRows, caseRows, sessionRows, photoRows, postRows, videoRows] = await Promise.all([
     db.getAllAsync('SELECT * FROM clients ORDER BY createdAt DESC, rowid DESC'),
     db.getAllAsync('SELECT * FROM cases ORDER BY createdAt DESC, rowid DESC'),
     db.getAllAsync('SELECT * FROM sessions ORDER BY createdAt ASC, rowid ASC'),
     db.getAllAsync('SELECT * FROM photos'),
     db.getAllAsync('SELECT * FROM posts ORDER BY createdAt DESC, rowid DESC'),
+    db.getAllAsync('SELECT * FROM videos ORDER BY createdAt ASC, rowid ASC'),
   ]);
 
   const casesById = {};
@@ -321,12 +474,22 @@ export async function loadAll() {
       bgRemove: !!p.bgRemove,
     };
   }
+  const videosBySession = {};
+  for (const v of videoRows) {
+    if (!videosBySession[v.sessionId]) videosBySession[v.sessionId] = [];
+    videosBySession[v.sessionId].push({
+      id: v.id, label: v.label || '', uri: v.localUri || undefined, videoKey: v.videoKey || undefined,
+      galleryAssetId: v.galleryAssetId || undefined, galleryUri: v.galleryUri || undefined,
+      fileMissing: !!v.fileMissing, durationSec: v.durationSec || undefined, createdAt: v.createdAt,
+    });
+  }
   const sessionsByCase = {};
   for (const s of sessionRows) {
     if (!sessionsByCase[s.caseId]) sessionsByCase[s.caseId] = [];
     sessionsByCase[s.caseId].push({
       id: s.id, kind: s.kind, label: s.label, date: s.date,
       refSource: s.refSource || undefined, photos: photosBySession[s.id] || {},
+      videos: videosBySession[s.id] || [],
     });
   }
   const postsByCase = {};
@@ -337,6 +500,7 @@ export async function loadAll() {
     postsByCase[p.caseId].push({
       id: p.id, caseId: p.caseId, mode: p.mode, format: p.format, slides, status: p.status || 'ready',
       createdAt: p.createdAt, sharedAt: p.sharedAt || undefined,
+      scheduledAt: p.scheduledAt || undefined, scheduledNotifId: p.scheduledNotifId || undefined,
     });
   }
   const casesByClient = {};

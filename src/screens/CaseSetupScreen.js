@@ -9,7 +9,8 @@ import { TopBar, ActionBar, Card, Avatar, Tag, Chip, Segmented, Field, Input, Bt
 import { C, PAD } from '../theme';
 import { useApp, useNav } from '../store';
 import { TREATMENTS, BEFORE_LABELS } from '../data/treatments';
-import { reqAngles, fmtDateLong, uid, TODAY } from '../data/helpers';
+import { reqAngles, fmtDateLong, uid } from '../data/helpers';
+import { todayISO } from '../data/clock';
 
 export default function CaseSetupScreen({ route }) {
   const params = route.params || {};
@@ -23,7 +24,7 @@ export default function CaseSetupScreen({ route }) {
   const [notes, setNotes] = React.useState('');
   const [pickOpen, setPickOpen] = React.useState(false);
   const [q, setQ] = React.useState('');
-  const date = TODAY;
+  const date = todayISO();
 
   const results = store.clients.filter(
     (x) => !q || x.name.toLowerCase().includes(q.toLowerCase()) || x.code.toLowerCase().includes(q.toLowerCase()) || x.phone.includes(q)

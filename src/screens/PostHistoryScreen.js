@@ -35,6 +35,7 @@ export default function PostHistoryScreen({ route }) {
           <View style={{ gap: 11 }}>
             {posts.map((post) => {
               const shared = post.status === 'shared';
+              const scheduled = !shared && !!post.scheduledAt;
               return (
                 <Card key={post.id} onPress={() => nav.go('postDetail', { cid: c.id, caseId: cs.id, postId: post.id })}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 12 }}>
@@ -42,7 +43,7 @@ export default function PostHistoryScreen({ route }) {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Txt style={{ fontWeight: '700', fontSize: 15, textTransform: 'capitalize' }}>{post.mode || 'single'}</Txt>
-                      <Tag variant={shared ? 'ok' : 'accent'} dot>{shared ? 'Shared' : 'Ready'}</Tag>
+                      <Tag variant={shared ? 'ok' : scheduled ? 'warn' : 'accent'} dot>{shared ? 'Shared' : scheduled ? 'Scheduled' : 'Ready'}</Tag>
                     </View>
                     <Txt mono style={{ fontSize: 11.5, color: C.ink3, marginTop: 3 }}>
                       {post.format} · {post.slides.length > 1 ? `${post.slides.length} slides` : '1 slide'} · {shared ? `shared ${fmtTs(post.sharedAt)}` : `ready ${fmtTs(post.createdAt)}`}
